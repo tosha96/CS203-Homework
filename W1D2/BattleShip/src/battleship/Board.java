@@ -43,6 +43,7 @@ public class Board {
             while ((line = reader.readLine()) != null) {
                 for (int i=0;i<line.length(); i++) {
                     char[] lineArray = line.toCharArray();
+                    this.matrix[lineNum][i] = new Cell();
                     if (lineArray[i] == 'O') {
                         this.numShipCells++;
                         this.matrix[lineNum][i].setIsShip(true);

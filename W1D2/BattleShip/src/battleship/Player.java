@@ -14,7 +14,16 @@ public class Player {
     private int hits;
     private int life;
     private String setUpFile;
+    private String name;
     Board board = new Board();
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
 
     public int getGuesses() {
         return guesses;
@@ -49,11 +58,11 @@ public class Player {
     }
     
     public void setUpPlayer() {
-        board.setUpCells(setUpFile);
-        this.life = board.getNumShipCells();
+        this.board.setUpCells(setUpFile);
+        this.life = this.board.getNumShipCells();
     }
     
-    public int tryHit(int x,int y) {
+    public int tryHit(int x,int y, Board board) {
         //0 = miss
         //1 = hit
         //2 = already attacked here

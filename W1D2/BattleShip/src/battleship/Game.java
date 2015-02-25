@@ -16,6 +16,14 @@ public class Game {
     public Player p2 = new Player();
     private boolean running = true;
 
+    public boolean isRunning() {
+        return running;
+    }
+
+    public void setRunning(boolean running) {
+        this.running = running;
+    }
+
     public void startGame() {
 
         p1.setSetUpFile("player1.txt");
@@ -25,7 +33,7 @@ public class Game {
         p2.setName("Player 2");
 
         p1.setUpPlayer();
-        p1.setUpPlayer();
+        p2.setUpPlayer();
 
         System.out.println("Welome to battleship!");
     }
@@ -54,17 +62,18 @@ public class Game {
 
     public int[] getRowColumn() {
         int[] result = new int[2];
-        result[0] = Integer.parseInt(helper.GetUserInput("Enter row number:"));
-        result[1] = Integer.parseInt(helper.GetUserInput("Enter column number:"));
+        //subtract 1 to account for readability
+        result[0] = Integer.parseInt(helper.GetUserInput("Enter row number:")) - 1;
+        result[1] = Integer.parseInt(helper.GetUserInput("Enter column number:")) - 1;
 
         return result;
     }
 
-    public void takeTurn(Player player) {
+    public void takeTurn(Player player, Player player2) {
         System.out.println(player.getName() + "'s turn:");
-        drawBoard(player.board);
+        drawBoard(player2.board);
         int[] guess = getRowColumn();
-        int result = player.tryHit(guess[0], guess[1]);
+        int result = player.tryHit(guess[0], guess[1], player2.board);
 
         if (result == 0) {
             System.out.println("Miss!");
@@ -73,22 +82,27 @@ public class Game {
         } else if (result == 2) {
             System.out.println("You already tried this square!");
         }
+        System.out.println("");
     }
 
     public void update() {
         if (p2.getHits() >= p1.getLife()) {
             System.out.println("Player 2 wins!");
+            drawBoard(p1.board);
+            this.running = false;
             return;
         }
         //player 1 goes first
-        takeTurn(p1);
+        takeTurn(p1, p2);
         
         if (p1.getHits() >= p2.getLife()) {
             System.out.println("Player 1 wins!");
+            drawBoard(p2.board);
+            this.running = false;
             return;
         }        
         
-        takeTurn(p2);
+        takeTurn(p2, p1);
     }
 
 }
