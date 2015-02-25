@@ -13,7 +13,7 @@ public class Cell {
     private boolean isHidden = true;
     private boolean isShip = false;
 
-    public boolean isIsHidden() {
+    public boolean getIsHidden() {
         return isHidden;
     }
 
@@ -21,7 +21,7 @@ public class Cell {
         this.isHidden = isHidden;
     }
 
-    public boolean isIsShip() {
+    public boolean getIsShip() {
         return isShip;
     }
 

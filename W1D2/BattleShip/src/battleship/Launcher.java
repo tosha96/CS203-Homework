@@ -27,10 +27,10 @@ public class Launcher {
             int y = Integer.parseInt(helper.GetUserInput("Enter column number:"));
             int result = game.tryHit(x - 1, y - 1); //subtract 1 from row and column numbers to account for readability
 
-            if (result == 1) {
-                System.out.println("Hit!");
-            } else if (result == 0) {
+            if (result == 0) {
                 System.out.println("Miss!");
+            } else if (result == 1) {
+                System.out.println("Hit!");
             } else if (result == 2) {
                 System.out.println("You already tried this square!");
             }

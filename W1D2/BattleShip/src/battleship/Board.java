@@ -19,7 +19,7 @@ import java.nio.file.Paths;
 public class Board {
     private int boardSize = 5;
     private int numShipCells;
-    private Cell[][] matrix = new Cell[boardSize][boardSize];
+    public Cell[][] matrix = new Cell[boardSize][boardSize];
 
     public int getBoardSize() {
         return boardSize;
@@ -33,8 +33,8 @@ public class Board {
         return numShipCells;
     }
     
-    private void setUpCells() {
-        Path inFile = Paths.get(System.getProperty("user.dir") + "\\src\\battleship\\gamesetup.txt");
+    public void setUpCells(String setUpFile) {
+        Path inFile = Paths.get(System.getProperty("user.dir") + "\\src\\battleship\\" + setUpFile);
 
         Charset charset = Charset.forName("US-ASCII");
         try (BufferedReader reader = Files.newBufferedReader(inFile, charset)) {
@@ -59,5 +59,18 @@ public class Board {
         } catch (IOException x) {
             System.err.format("IOException: %s%n", x);
         }
+    }
+
+    public int tryHit(int x, int y) {
+        if (this.matrix[x][y].getIsHidden() == false) {
+            return 2;
+        } else {
+            this.matrix[x][y].setIsHidden(false);
+        }
+
+        if (this.matrix[x][y].getIsShip() == true) {
+            return 1;
+        }
+        return 0;
     }
 }
