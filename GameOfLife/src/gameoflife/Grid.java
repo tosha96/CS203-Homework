@@ -45,7 +45,25 @@ public class Grid {
         [i+1]     [j-1][j][j-1]
         */
         
-        //need a que for cell births and deaths
+        //need a queue for cell births and deaths
+        //implemented in aliveNext var
+        
+        for (int i=0; i<this.gridSize; i++) {
+            for (int j=0; j<this.gridSize; j++) { //initial array iteration
+                int aliveCount = 0;
+                
+                for (int k=-1;k<=1;k++) {
+                    for (int m=-1;m<=1;m++) {
+                        if (k == 0 && m == 0) { //make sure that we don't check relationship to self
+                            continue;
+                        }
+                        
+                        
+                    }   
+                }
+                this.matrix[i][j] = new Cell();
+            }
+        }
     }
     
     
