@@ -10,7 +10,7 @@ package gameoflife;
  * @author Aantokhin
  */
 public class Grid {
-    private int gridSize = 100;
+    private int gridSize = 1000;
     public Cell[][] matrix = new Cell[gridSize][gridSize];
     
     public void setUpGrid() {
@@ -19,11 +19,13 @@ public class Grid {
                 this.matrix[i][j] = new Cell();
             }
         }
-        matrix[3][2].setAlive(true);
-        matrix[3][3].setAlive(true);
-        matrix[3][4].setAlive(true);
-        matrix[2][4].setAlive(true);
-        matrix[1][3].setAlive(true);
+        
+        matrix[503][502].setAlive(true);
+        matrix[503][503].setAlive(true);
+        matrix[503][504].setAlive(true);
+        matrix[502][504].setAlive(true);
+        matrix[501][503].setAlive(true);
+        
     }
 
     public int getGridSize() {

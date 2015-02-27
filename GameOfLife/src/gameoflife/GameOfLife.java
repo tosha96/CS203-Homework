@@ -20,7 +20,9 @@ public class GameOfLife implements ActionListener {
      */
     Grid grid = new Grid();
     JButton button;
-    boolean running = true;
+    boolean running = false;
+    int offset = 500; //offset so cells don't hit wall close to window edges
+    //offset is in unit of cells, must multipy by cell width or length (10) to convert to pixels
 
     public static void main(String[] args) {
         GameOfLife game = new GameOfLife();
@@ -39,8 +41,26 @@ public class GameOfLife implements ActionListener {
         grid.setUpGrid();
 
         DrawGrid drawGrid = new DrawGrid();
-        button = new JButton("Pause");
+        button = new JButton("Unpause"); //starts off paused
         button.addActionListener(this);
+
+        drawGrid.addMouseListener(new MouseAdapter() { //code to get mouse position
+            public void mouseClicked(MouseEvent e) {
+                Point point = e.getPoint();
+                int iCoord = (int) (point.y/10) + offset; //add back in offset to account for where we took it off during drawing
+                int jCoord = (int) (point.x/10) + offset;
+                if (running == false) {
+                    if (grid.matrix[iCoord][jCoord].isAlive() == true) {
+                        grid.matrix[iCoord][jCoord].setAliveNext(false);
+                        grid.matrix[iCoord][jCoord].setAlive(false);
+                    } else {
+                        grid.matrix[iCoord][jCoord].setAliveNext(true);
+                        grid.matrix[iCoord][jCoord].setAlive(true);
+                    }
+                    drawGrid.repaint();
+                }
+            }
+        });
 
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
@@ -76,9 +96,9 @@ public class GameOfLife implements ActionListener {
             for (int i = 0; i < grid.getGridSize(); i++) {
                 for (int j = 0; j < grid.getGridSize(); j++) {
                     if (grid.matrix[i][j].isAlive() == true) {
-                        int iCord = i * 10;
-                        int jCord = j * 10;
-                        g.fillRect(jCord, iCord, 10, 10); //same setup as battleship coords
+                        int iCoord = (i * 10) - (offset * 10); //subtract an offset so game displays cell matrix[+offset][+offset]
+                        int jCoord = (j * 10) - (offset * 10);
+                        g.fillRect(jCoord, iCoord, 10, 10); //same setup as battleship coords
                         //j and i coords switched?
 
                     }
