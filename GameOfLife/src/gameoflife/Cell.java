@@ -13,6 +13,14 @@ public class Cell {
     private boolean alive = false;
     private boolean aliveNext = false;
 
+    public boolean isAliveNext() {
+        return aliveNext;
+    }
+
+    public void setAliveNext(boolean aliveNext) {
+        this.aliveNext = aliveNext;
+    }
+
     public boolean isAlive() {
         return alive;
     }
@@ -21,5 +29,7 @@ public class Cell {
         this.alive = alive;
     }
     
-    
+    public void update() {
+        this.alive = this.aliveNext;
+    }
 }

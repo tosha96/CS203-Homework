@@ -10,7 +10,7 @@ package gameoflife;
  * @author Aantokhin
  */
 public class Grid {
-    private int gridSize = 10;
+    private int gridSize = 100;
     public Cell[][] matrix = new Cell[gridSize][gridSize];
     
     public void setUpGrid() {
@@ -19,8 +19,11 @@ public class Grid {
                 this.matrix[i][j] = new Cell();
             }
         }
-        matrix[0][0].setAlive(true);
-        matrix[1][0].setAlive(true);
+        matrix[3][2].setAlive(true);
+        matrix[3][3].setAlive(true);
+        matrix[3][4].setAlive(true);
+        matrix[2][4].setAlive(true);
+        matrix[1][3].setAlive(true);
     }
 
     public int getGridSize() {
@@ -42,7 +45,7 @@ public class Grid {
        /*
         [i-1]     [j-1][j][j+1]
         [i]       [j-1][j][j+1]
-        [i+1]     [j-1][j][j-1]
+        [i+1]     [j-1][j][j+1]
         */
         
         //need a queue for cell births and deaths
@@ -50,18 +53,41 @@ public class Grid {
         
         for (int i=0; i<this.gridSize; i++) {
             for (int j=0; j<this.gridSize; j++) { //initial array iteration
-                int aliveCount = 0;
+                int aliveCount = 0; //count of alive neighbors
                 
                 for (int k=-1;k<=1;k++) {
                     for (int m=-1;m<=1;m++) {
                         if (k == 0 && m == 0) { //make sure that we don't check relationship to self
                             continue;
                         }
-                        
-                        
-                    }   
+                        if ((i+k) < 0 || (j+m) < 0 || (i+k) >= this.gridSize || (j+m) >= this.gridSize) { //treat cells outside bounds as dead cells
+                            continue;
+                        }
+                        if (matrix[i+k][j+m].isAlive() == true) {
+                            aliveCount++;
+                        }
+                    }
                 }
-                this.matrix[i][j] = new Cell();
+                
+                if (matrix[i][j].isAlive() == true) { //logic to control cell birth and death
+                    if (aliveCount < 2) {
+                        matrix[i][j].setAliveNext(false);
+                    } else if (aliveCount == 2 || aliveCount == 3) {
+                        matrix[i][j].setAliveNext(true);
+                    } else if (aliveCount > 3) {
+                        matrix[i][j].setAliveNext(false);
+                    }
+                } else {
+                    if (aliveCount == 3) {
+                        matrix[i][j].setAliveNext(true);
+                    }
+                }
+            }
+        }
+        
+        for (int i=0; i<this.gridSize; i++) { //now that changes have been calculated, update cells
+            for (int j=0; j<this.gridSize; j++) { 
+                this.matrix[i][j].update();
             }
         }
     }
