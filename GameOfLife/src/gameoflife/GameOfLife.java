@@ -61,6 +61,31 @@ public class GameOfLife implements ActionListener {
                 }
             }
         });
+        
+        frame.addKeyListener(new KeyAdapter() {
+            public void keyReleased(KeyEvent e) {
+
+            }
+ 
+            public void keyTyped(KeyEvent e) {
+                // TODO: Do something for the keyTyped event
+            }
+ 
+            public void keyPressed(KeyEvent e) {
+                int keyCode = e.getKeyCode();
+                if (e.getKeyCode()== KeyEvent.VK_LEFT)
+                {
+                    offset ++;
+                    drawGrid.repaint();
+                }
+
+                else if (e.getKeyCode()== KeyEvent.VK_RIGHT)
+                {
+                    offset --;
+                    drawGrid.repaint();
+                }
+            }
+        });
 
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
