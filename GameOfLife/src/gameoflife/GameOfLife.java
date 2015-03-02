@@ -21,7 +21,8 @@ public class GameOfLife implements ActionListener {
     Grid grid = new Grid();
     JButton button;
     boolean running = false;
-    int offset = 500; //offset so cells don't hit wall close to window edges
+    int horizontalOffset = 500; //offset so cells don't hit wall close to window edges
+    int verticalOffset = 500;
     //offset is in unit of cells, must multipy by cell width or length (10) to convert to pixels
 
     public static void main(String[] args) {
@@ -47,8 +48,8 @@ public class GameOfLife implements ActionListener {
         drawGrid.addMouseListener(new MouseAdapter() { //code to get mouse position
             public void mouseClicked(MouseEvent e) {
                 Point point = e.getPoint();
-                int iCoord = (int) (point.y/10) + offset; //add back in offset to account for where we took it off during drawing
-                int jCoord = (int) (point.x/10) + offset;
+                int iCoord = (int) (point.y/10) + verticalOffset; //add back in offset to account for where we took it off during drawing
+                int jCoord = (int) (point.x/10) + horizontalOffset;
                 if (running == false) {
                     if (grid.matrix[iCoord][jCoord].isAlive() == true) {
                         grid.matrix[iCoord][jCoord].setAliveNext(false);
@@ -62,28 +63,42 @@ public class GameOfLife implements ActionListener {
             }
         });
         
-        frame.addKeyListener(new KeyAdapter() {
+        button.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) {
 
             }
  
             public void keyTyped(KeyEvent e) {
-                // TODO: Do something for the keyTyped event
+
             }
  
             public void keyPressed(KeyEvent e) {
                 int keyCode = e.getKeyCode();
                 if (e.getKeyCode()== KeyEvent.VK_LEFT)
                 {
-                    offset ++;
+                    System.out.println("Left.");
+                    horizontalOffset --; //directions are reversed for panning
                     drawGrid.repaint();
                 }
 
                 else if (e.getKeyCode()== KeyEvent.VK_RIGHT)
                 {
-                    offset --;
+                    System.out.println("Right.");
+                    horizontalOffset ++;
                     drawGrid.repaint();
                 }
+                else if (e.getKeyCode()== KeyEvent.VK_UP)
+                {
+                    System.out.println("Up.");
+                    verticalOffset --;
+                    drawGrid.repaint();
+                }   
+                else if (e.getKeyCode()== KeyEvent.VK_DOWN)
+                {
+                    System.out.println("Down.");
+                    verticalOffset ++;
+                    drawGrid.repaint();
+                }                   
             }
         });
 
@@ -121,8 +136,8 @@ public class GameOfLife implements ActionListener {
             for (int i = 0; i < grid.getGridSize(); i++) {
                 for (int j = 0; j < grid.getGridSize(); j++) {
                     if (grid.matrix[i][j].isAlive() == true) {
-                        int iCoord = (i * 10) - (offset * 10); //subtract an offset so game displays cell matrix[+offset][+offset]
-                        int jCoord = (j * 10) - (offset * 10);
+                        int iCoord = (i * 10) - (verticalOffset * 10); //subtract an offset so game displays cell matrix[+offset][+offset]
+                        int jCoord = (j * 10) - (horizontalOffset * 10);
                         g.fillRect(jCoord, iCoord, 10, 10); //same setup as battleship coords
                         //j and i coords switched?
 
