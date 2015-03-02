@@ -5,6 +5,8 @@
  */
 package gameoflife;
 
+import java.util.ArrayList;
+
 /**
  *
  * @author Aantokhin
@@ -55,7 +57,7 @@ public class Grid {
         
         for (int i=0; i<this.gridSize; i++) {
             for (int j=0; j<this.gridSize; j++) { //initial array iteration
-                int aliveCount = 0; //count of alive neighbors
+                ArrayList<Cell> neighbors = new ArrayList<>(); //count of alive neighbors
                 
                 for (int k=-1;k<=1;k++) {
                     for (int m=-1;m<=1;m++) {
@@ -66,21 +68,21 @@ public class Grid {
                             continue;
                         }
                         if (matrix[i+k][j+m].isAlive() == true) {
-                            aliveCount++;
+                            neighbors.add(matrix[i+k][j+m]); //add copy of cell to neighbors list if alive
                         }
                     }
                 }
                 
                 if (matrix[i][j].isAlive() == true) { //logic to control cell birth and death
-                    if (aliveCount < 2) {
+                    if (neighbors.size() < 2) {
                         matrix[i][j].setAliveNext(false);
-                    } else if (aliveCount == 2 || aliveCount == 3) {
+                    } else if (neighbors.size() == 2 || neighbors.size() == 3) {
                         matrix[i][j].setAliveNext(true);
-                    } else if (aliveCount > 3) {
+                    } else if (neighbors.size() > 3) {
                         matrix[i][j].setAliveNext(false);
                     }
                 } else {
-                    if (aliveCount == 3) {
+                    if (neighbors.size() == 3) {
                         matrix[i][j].setAliveNext(true);
                     }
                 }

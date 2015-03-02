@@ -8,25 +8,40 @@ package gameoflife;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 /**
  *
  * @author Aantokhin
  */
-public class GameOfLife implements ActionListener {
+public class GameOfLife implements ActionListener, ChangeListener {
 
     /**
      * @param args the command line arguments
      */
     Grid grid = new Grid();
+    DrawGrid drawGrid = new DrawGrid();
+    
     JButton pauseButton;
     JButton gridButton;
+    JPanel panel = new JPanel();
+    JPanel sliderPanel = new JPanel();
+    JLabel sliderLabel = new JLabel("Speed in MS:");
+    
     boolean running = false;
     boolean gridOn = false;
     int horizontalOffset = 500; //offset so cells don't hit wall close to window edges
     int verticalOffset = 500;
     //offset is in unit of cells, must multipy by cell width or length (10) to convert to pixels
     int zoom = 10;
+    int speed = 250;
+
+    final static int minSpeed = 0;
+    final static int maxSpeed = 500;
+    final static int initSpeed = 250;
+
+    JSlider speedSlider = new JSlider(JSlider.HORIZONTAL, minSpeed, maxSpeed, initSpeed);
 
     public static void main(String[] args) {
         GameOfLife game = new GameOfLife();
@@ -44,12 +59,17 @@ public class GameOfLife implements ActionListener {
 
         grid.setUpGrid();
 
-        DrawGrid drawGrid = new DrawGrid();
         pauseButton = new JButton("Unpause"); //starts off paused
         pauseButton.addActionListener(this);
         gridButton = new JButton("Grid on"); //starts off paused
         gridButton.addActionListener(this);
-
+        
+        speedSlider.addChangeListener(this);
+        speedSlider.setMajorTickSpacing(250);
+        speedSlider.setMajorTickSpacing(100);
+        speedSlider.setPaintTicks(true);
+        speedSlider.setPaintLabels(true);
+        
         drawGrid.addMouseListener(new MouseAdapter() { //code to get mouse position
             public void mouseClicked(MouseEvent e) {
                 Point point = e.getPoint();
@@ -123,9 +143,18 @@ public class GameOfLife implements ActionListener {
 
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        frame.getContentPane().add(BorderLayout.CENTER, drawGrid);
-        frame.getContentPane().add(BorderLayout.SOUTH, pauseButton);
-        frame.getContentPane().add(BorderLayout.EAST, gridButton);
+        drawGrid.setSize(300, 300);
+        panel.add(pauseButton);
+        panel.add(gridButton);
+
+        //keep slider stuff on it's own panel
+        sliderPanel.add(sliderLabel);
+        sliderPanel.add(speedSlider);
+        panel.add(sliderPanel);
+        
+        frame.getContentPane().add(BorderLayout.SOUTH, panel);
+        frame.getContentPane().add(BorderLayout.CENTER, drawGrid);//keep drawgrid center so it doesn't shrink
+
         frame.setSize(600, 600);
 
         frame.setVisible(true);
@@ -134,7 +163,16 @@ public class GameOfLife implements ActionListener {
                 grid.updateGrid();
                 drawGrid.repaint();
             }
-            Thread.sleep(250);
+            Thread.sleep(speed);
+        }
+    }
+
+    public void stateChanged(ChangeEvent e) {
+        JSlider source = (JSlider) e.getSource();
+        if (!source.getValueIsAdjusting()) {
+            if (source == speedSlider) {
+                speed = source.getValue();
+            }
         }
     }
 
@@ -155,6 +193,7 @@ public class GameOfLife implements ActionListener {
             } else {
                 gridButton.setText("Grid on");
             }
+            drawGrid.repaint();
         }
     }
 
@@ -163,25 +202,28 @@ public class GameOfLife implements ActionListener {
         public void paintComponent(Graphics g) {
             g.setColor(Color.white);
             g.fillRect(0, 0, this.getWidth(), this.getWidth());
-            g.setColor(Color.green);
+            //g.setColor(Color.green);
             for (int i = 0; i < grid.getGridSize(); i++) {
                 int iCoord = (i * zoom) - (verticalOffset * zoom); //subtract an offset so game displays cell matrix[+offset][+offset]
                 for (int j = 0; j < grid.getGridSize(); j++) {
                     int jCoord = (j * zoom) - (horizontalOffset * zoom);
                     if (grid.matrix[i][j].isAlive() == true) {
+                        int test1 = grid.matrix[i][j].getR();
+                        Color cellColor = new Color(grid.matrix[i][j].getR(), grid.matrix[i][j].getG(), grid.matrix[i][j].getB());
+                        //Color cellColor = new Color(100,100,100);
+                        g.setColor(cellColor);
                         g.fillRect(jCoord, iCoord, zoom, zoom); //same setup as battleship coords
                         //j and i coords switched?
                     }
                     if (gridOn) {
                         g.setColor(Color.black);
                         g.fillRect(jCoord, 0, 1, this.getHeight()); //vertical grid lines
-                        g.setColor(Color.green);
                     }
                 }
                 if (gridOn) {
                     g.setColor(Color.black);
                     g.fillRect(0, iCoord, this.getWidth(), 1); //horizontal grid lines
-                    g.setColor(Color.green);
+
                 }
             }
         }
