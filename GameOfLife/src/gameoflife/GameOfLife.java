@@ -19,11 +19,14 @@ public class GameOfLife implements ActionListener {
      * @param args the command line arguments
      */
     Grid grid = new Grid();
-    JButton button;
+    JButton pauseButton;
+    JButton gridButton;
     boolean running = false;
+    boolean gridOn = false;
     int horizontalOffset = 500; //offset so cells don't hit wall close to window edges
     int verticalOffset = 500;
     //offset is in unit of cells, must multipy by cell width or length (10) to convert to pixels
+    int zoom = 10;
 
     public static void main(String[] args) {
         GameOfLife game = new GameOfLife();
@@ -42,14 +45,16 @@ public class GameOfLife implements ActionListener {
         grid.setUpGrid();
 
         DrawGrid drawGrid = new DrawGrid();
-        button = new JButton("Unpause"); //starts off paused
-        button.addActionListener(this);
+        pauseButton = new JButton("Unpause"); //starts off paused
+        pauseButton.addActionListener(this);
+        gridButton = new JButton("Grid on"); //starts off paused
+        gridButton.addActionListener(this);
 
         drawGrid.addMouseListener(new MouseAdapter() { //code to get mouse position
             public void mouseClicked(MouseEvent e) {
                 Point point = e.getPoint();
-                int iCoord = (int) (point.y/10) + verticalOffset; //add back in offset to account for where we took it off during drawing
-                int jCoord = (int) (point.x/10) + horizontalOffset;
+                int iCoord = (int) (point.y / zoom) + verticalOffset; //add back in offset to account for where we took it off during drawing
+                int jCoord = (int) (point.x / zoom) + horizontalOffset;
                 if (running == false) {
                     if (grid.matrix[iCoord][jCoord].isAlive() == true) {
                         grid.matrix[iCoord][jCoord].setAliveNext(false);
@@ -62,51 +67,66 @@ public class GameOfLife implements ActionListener {
                 }
             }
         });
-        
-        button.addKeyListener(new KeyAdapter() {
-            public void keyReleased(KeyEvent e) {
 
+        drawGrid.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, 0), "left");
+        drawGrid.getActionMap().put("left", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                horizontalOffset--; //directions are reversed for panning
+                drawGrid.repaint();
             }
- 
-            public void keyTyped(KeyEvent e) {
-
+        });
+        drawGrid.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0), "right");
+        drawGrid.getActionMap().put("right", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                horizontalOffset++;
+                drawGrid.repaint();
             }
- 
-            public void keyPressed(KeyEvent e) {
-                int keyCode = e.getKeyCode();
-                if (e.getKeyCode()== KeyEvent.VK_LEFT)
-                {
-                    System.out.println("Left.");
-                    horizontalOffset --; //directions are reversed for panning
-                    drawGrid.repaint();
-                }
-
-                else if (e.getKeyCode()== KeyEvent.VK_RIGHT)
-                {
-                    System.out.println("Right.");
-                    horizontalOffset ++;
-                    drawGrid.repaint();
-                }
-                else if (e.getKeyCode()== KeyEvent.VK_UP)
-                {
-                    System.out.println("Up.");
-                    verticalOffset --;
-                    drawGrid.repaint();
-                }   
-                else if (e.getKeyCode()== KeyEvent.VK_DOWN)
-                {
-                    System.out.println("Down.");
-                    verticalOffset ++;
-                    drawGrid.repaint();
-                }                   
+        });
+        drawGrid.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_UP, 0), "up");
+        drawGrid.getActionMap().put("up", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                verticalOffset--;
+                drawGrid.repaint();
+            }
+        });
+        drawGrid.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_DOWN, 0), "down");
+        drawGrid.getActionMap().put("down", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                verticalOffset++;
+                drawGrid.repaint();
+            }
+        });
+        drawGrid.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_EQUALS, 0), "plus");
+        drawGrid.getActionMap().put("plus", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                zoom++;
+                verticalOffset -= 1 / zoom;
+                horizontalOffset -= 1 / zoom;
+                drawGrid.repaint();
+            }
+        });
+        drawGrid.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_MINUS, 0), "minus");
+        drawGrid.getActionMap().put("minus", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                zoom--;
+                verticalOffset += 1 / zoom;
+                horizontalOffset += 1 / zoom;
+                drawGrid.repaint();
             }
         });
 
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         frame.getContentPane().add(BorderLayout.CENTER, drawGrid);
-        frame.getContentPane().add(BorderLayout.SOUTH, button);
-        frame.setSize(300, 300);
+        frame.getContentPane().add(BorderLayout.SOUTH, pauseButton);
+        frame.getContentPane().add(BorderLayout.EAST, gridButton);
+        frame.setSize(600, 600);
 
         frame.setVisible(true);
         while (1 == 1) {
@@ -119,11 +139,22 @@ public class GameOfLife implements ActionListener {
     }
 
     public void actionPerformed(ActionEvent event) {
-        running = !running; //toggle running state
-        if (running) {
-            button.setText("Pause");
-        } else {
-            button.setText("Unpause");
+        if (event.getSource() == pauseButton) {
+            running = !running; //toggle running state
+            if (running) {
+                pauseButton.setText("Pause");
+            } else {
+                pauseButton.setText("Unpause");
+            }
+        }
+
+        if (event.getSource() == gridButton) {
+            gridOn = !gridOn; //toggle running state
+            if (gridOn) {
+                gridButton.setText("Grid off");
+            } else {
+                gridButton.setText("Grid on");
+            }
         }
     }
 
@@ -134,14 +165,23 @@ public class GameOfLife implements ActionListener {
             g.fillRect(0, 0, this.getWidth(), this.getWidth());
             g.setColor(Color.green);
             for (int i = 0; i < grid.getGridSize(); i++) {
+                int iCoord = (i * zoom) - (verticalOffset * zoom); //subtract an offset so game displays cell matrix[+offset][+offset]
                 for (int j = 0; j < grid.getGridSize(); j++) {
+                    int jCoord = (j * zoom) - (horizontalOffset * zoom);
                     if (grid.matrix[i][j].isAlive() == true) {
-                        int iCoord = (i * 10) - (verticalOffset * 10); //subtract an offset so game displays cell matrix[+offset][+offset]
-                        int jCoord = (j * 10) - (horizontalOffset * 10);
-                        g.fillRect(jCoord, iCoord, 10, 10); //same setup as battleship coords
+                        g.fillRect(jCoord, iCoord, zoom, zoom); //same setup as battleship coords
                         //j and i coords switched?
-
                     }
+                    if (gridOn) {
+                        g.setColor(Color.black);
+                        g.fillRect(jCoord, 0, 1, this.getHeight()); //vertical grid lines
+                        g.setColor(Color.green);
+                    }
+                }
+                if (gridOn) {
+                    g.setColor(Color.black);
+                    g.fillRect(0, iCoord, this.getWidth(), 1); //horizontal grid lines
+                    g.setColor(Color.green);
                 }
             }
         }
