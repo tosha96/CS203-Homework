@@ -22,10 +22,12 @@ public class GameOfLife implements ActionListener, ChangeListener {
      */
     Grid grid = new Grid();
     DrawGrid drawGrid = new DrawGrid();
+    ColorSelector colorSelector = new ColorSelector();
     
     JButton pauseButton;
     JButton gridButton;
     JPanel panel = new JPanel();
+    JPanel csPanel = new JPanel();
     JPanel sliderPanel = new JPanel();
     JLabel sliderLabel = new JLabel("Speed in MS:");
     
@@ -36,6 +38,7 @@ public class GameOfLife implements ActionListener, ChangeListener {
     //offset is in unit of cells, must multipy by cell width or length (10) to convert to pixels
     int zoom = 10;
     int speed = 250;
+    Color selectedColor = new Color(0, 0, 0);
 
     final static int minSpeed = 0;
     final static int maxSpeed = 500;
@@ -58,17 +61,6 @@ public class GameOfLife implements ActionListener, ChangeListener {
         //JButton button = new JButton("click me");
 
         grid.setUpGrid();
-
-        pauseButton = new JButton("Unpause"); //starts off paused
-        pauseButton.addActionListener(this);
-        gridButton = new JButton("Grid on"); //starts off paused
-        gridButton.addActionListener(this);
-        
-        speedSlider.addChangeListener(this);
-        speedSlider.setMajorTickSpacing(250);
-        speedSlider.setMajorTickSpacing(100);
-        speedSlider.setPaintTicks(true);
-        speedSlider.setPaintLabels(true);
         
         drawGrid.addMouseListener(new MouseAdapter() { //code to get mouse position
             public void mouseClicked(MouseEvent e) {
@@ -80,10 +72,30 @@ public class GameOfLife implements ActionListener, ChangeListener {
                         grid.matrix[iCoord][jCoord].setAliveNext(false);
                         grid.matrix[iCoord][jCoord].setAlive(false);
                     } else {
+                        grid.matrix[iCoord][jCoord].setColor(selectedColor);
                         grid.matrix[iCoord][jCoord].setAliveNext(true);
                         grid.matrix[iCoord][jCoord].setAlive(true);
                     }
                     drawGrid.repaint();
+                }
+            }
+        });
+        
+        colorSelector.addMouseListener(new MouseAdapter() { //code to get mouse position
+            public void mouseClicked(MouseEvent e) {
+                Point point = e.getPoint();
+                if (point.y < 15 ) {
+                    if (point.x < 15) {
+                        selectedColor = Color.blue;
+                    } else {
+                        selectedColor = Color.red;
+                    } 
+                } else {
+                    if (point.x < 15) {
+                        selectedColor = Color.black;
+                    } else {
+                        selectedColor = Color.green;
+                    }
                 }
             }
         });
@@ -142,8 +154,23 @@ public class GameOfLife implements ActionListener, ChangeListener {
         });
 
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        pauseButton = new JButton("Unpause"); //starts off paused
+        pauseButton.addActionListener(this);
+        gridButton = new JButton("Grid on"); //starts off paused
+        gridButton.addActionListener(this);
+        
+        speedSlider.addChangeListener(this);
+        speedSlider.setMajorTickSpacing(250);
+        speedSlider.setMajorTickSpacing(100);
+        speedSlider.setPaintTicks(true);
+        speedSlider.setPaintLabels(true);
 
-        drawGrid.setSize(300, 300);
+        //drawGrid.setSize(300, 300);
+        //colorSelector.setSize(30, 30);
+        csPanel.setLayout(new BoxLayout(csPanel, BoxLayout.Y_AXIS));
+        csPanel.setPreferredSize(new Dimension(30,30));
+        csPanel.add(colorSelector);
+        panel.add(csPanel);
         panel.add(pauseButton);
         panel.add(gridButton);
 
@@ -156,6 +183,8 @@ public class GameOfLife implements ActionListener, ChangeListener {
         frame.getContentPane().add(BorderLayout.CENTER, drawGrid);//keep drawgrid center so it doesn't shrink
 
         frame.setSize(600, 600);
+        
+        frame.setTitle("Game of Life");
 
         frame.setVisible(true);
         while (1 == 1) {
@@ -208,8 +237,7 @@ public class GameOfLife implements ActionListener, ChangeListener {
                 for (int j = 0; j < grid.getGridSize(); j++) {
                     int jCoord = (j * zoom) - (horizontalOffset * zoom);
                     if (grid.matrix[i][j].isAlive() == true) {
-                        int test1 = grid.matrix[i][j].getR();
-                        Color cellColor = new Color(grid.matrix[i][j].getR(), grid.matrix[i][j].getG(), grid.matrix[i][j].getB());
+                        Color cellColor = grid.matrix[i][j].getColor();
                         //Color cellColor = new Color(100,100,100);
                         g.setColor(cellColor);
                         g.fillRect(jCoord, iCoord, zoom, zoom); //same setup as battleship coords
@@ -228,6 +256,19 @@ public class GameOfLife implements ActionListener, ChangeListener {
             }
         }
 
+    }
+    
+    class ColorSelector extends JPanel {
+        public void paintComponent(Graphics g) {
+            g.setColor(Color.blue);
+            g.fillRect(0, 0, 15, 15);
+            g.setColor(Color.red);
+            g.fillRect(15, 0, 15, 15);
+            g.setColor(Color.green);
+            g.fillRect(15, 15, 15, 15);
+            g.setColor(Color.black);
+            g.fillRect(0, 15, 15, 15);
+        }
     }
 
 }

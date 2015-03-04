@@ -5,6 +5,8 @@
  */
 package gameoflife;
 
+import java.awt.Color;
+
 /**
  *
  * @author Aantokhin
@@ -12,34 +14,16 @@ package gameoflife;
 public class Cell {
     private boolean alive = false;
     private boolean aliveNext = false;
-    private int r = 100;
-    private int g = 100;
-    private int b = 100;
+    private Color color = new Color(0,0,0);
 
-    public int getR() {
-        return r;
+    public Color getColor() {
+        return color;
     }
 
-    public void setR(int r) {
-        this.r = r;
+    public void setColor(Color color) {
+        this.color = color;
     }
 
-    public int getG() {
-        return g;
-    }
-
-    public void setG(int g) {
-        this.g = g;
-    }
-
-    public int getB() {
-        return b;
-    }
-
-    public void setB(int b) {
-        this.b = b;
-    }
-    
     public boolean isAliveNext() {
         return aliveNext;
     }
