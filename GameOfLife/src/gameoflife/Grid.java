@@ -23,8 +23,20 @@ public class Grid {
         }
         
         matrix[503][502].setAlive(true);
+        matrix[503][502].setR(145);
+        matrix[503][502].setG(187);
+        matrix[503][502].setB(45);
+        
         matrix[503][503].setAlive(true);
+        matrix[503][503].setR(98);
+        matrix[503][503].setG(175);
+        matrix[503][503].setB(200);
+        
         matrix[503][504].setAlive(true);
+        matrix[503][504].setR(120);
+        matrix[503][504].setG(21);
+        matrix[503][504].setB(190);
+        
         matrix[502][504].setAlive(true);
         matrix[501][503].setAlive(true);
         
@@ -83,6 +95,10 @@ public class Grid {
                     }
                 } else {
                     if (neighbors.size() == 3) {
+                        int randInt = (int) Math.random() * 3;
+                        matrix[i][j].setR(neighbors.get(randInt).getR());
+                        matrix[i][j].setG(neighbors.get(randInt).getG());
+                        matrix[i][j].setB(neighbors.get(randInt).getB());
                         matrix[i][j].setAliveNext(true);
                     }
                 }

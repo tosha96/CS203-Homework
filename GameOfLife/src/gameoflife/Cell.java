@@ -16,7 +16,7 @@ public class Cell {
     private int g = 100;
     private int b = 100;
 
-    public float getR() {
+    public int getR() {
         return r;
     }
 
@@ -24,7 +24,7 @@ public class Cell {
         this.r = r;
     }
 
-    public float getG() {
+    public int getG() {
         return g;
     }
 
@@ -32,7 +32,7 @@ public class Cell {
         this.g = g;
     }
 
-    public float getB() {
+    public int getB() {
         return b;
     }
 
