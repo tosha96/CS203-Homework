@@ -38,7 +38,7 @@ public class GameOfLife implements ActionListener, ChangeListener {
     //offset is in unit of cells, must multipy by cell width or length (10) to convert to pixels
     int zoom = 10;
     int speed = 250;
-    Color selectedColor = new Color(0, 0, 0);
+    Color selectedColor = Color.green;
 
     final static int minSpeed = 0;
     final static int maxSpeed = 500;
@@ -65,7 +65,8 @@ public class GameOfLife implements ActionListener, ChangeListener {
         drawGrid.addMouseListener(new MouseAdapter() { //code to get mouse position
             public void mouseClicked(MouseEvent e) {
                 Point point = e.getPoint();
-                int iCoord = (int) (point.y / zoom) + verticalOffset; //add back in offset to account for where we took it off during drawing
+                int iCoord = (int) (point.y / zoom) + verticalOffset; 
+                //add back in offset to account for where we took it off during drawing
                 int jCoord = (int) (point.x / zoom) + horizontalOffset;
                 if (running == false) {
                     if (grid.matrix[iCoord][jCoord].isAlive() == true) {
@@ -233,7 +234,8 @@ public class GameOfLife implements ActionListener, ChangeListener {
             g.fillRect(0, 0, this.getWidth(), this.getWidth());
             //g.setColor(Color.green);
             for (int i = 0; i < grid.getGridSize(); i++) {
-                int iCoord = (i * zoom) - (verticalOffset * zoom); //subtract an offset so game displays cell matrix[+offset][+offset]
+                int iCoord = (i * zoom) - (verticalOffset * zoom); 
+                //subtract an offset so game displays cell matrix[+offset][+offset]
                 for (int j = 0; j < grid.getGridSize(); j++) {
                     int jCoord = (j * zoom) - (horizontalOffset * zoom);
                     if (grid.matrix[i][j].isAlive() == true) {

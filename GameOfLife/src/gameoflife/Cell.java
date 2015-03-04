@@ -14,7 +14,7 @@ import java.awt.Color;
 public class Cell {
     private boolean alive = false;
     private boolean aliveNext = false;
-    private Color color = new Color(0,0,0);
+    private Color color = Color.green;
 
     public Color getColor() {
         return color;
