@@ -3,14 +3,13 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package chatserver;
+package chatframework;
 
 /**
  *
  * @author Aantokhin
  */
-public class Message {
-    private User sender;
-    private String content;
+public class User {
+    private String username;
     
 }
