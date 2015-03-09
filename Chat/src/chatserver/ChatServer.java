@@ -16,8 +16,7 @@ import java.util.*;
  */
 public class ChatServer {
 
-    ArrayList<ObjectOutputStream> clientOutputStreams = new ArrayList<>();
-    ArrayList<User> users = new ArrayList<>();
+    Vector<User> users = new Vector<>();
 
     public class ClientHandler implements Runnable {
 
@@ -35,10 +34,8 @@ public class ChatServer {
         public void run() {
             Message message;
             try {
-                //implement disconnected user handling here
                 while ((message = (Message) users.get(userIndex).inputStream.readObject()) != null) {
                     message.setUser(users.get(userIndex).getUsername());
-                    //System.out.println("read " + message.getContent() + " from " + message.getUser());
                     if (message.getDestination().equals("setName")) {
                         setName(userIndex, message.getContent());
                     } else {
@@ -47,11 +44,11 @@ public class ChatServer {
                         }
                     }
                 }
-            } /*catch (SocketException ex) { //handles disconnected users
+            } catch (SocketException ex) { //handles disconnected users
                 broadcastMessage(new Message(users.get(userIndex).getUsername() 
-                        + " disconnected: " + ex.getMessage(), "Server", "all"));
-                //users.remove(userIndex);
-            } */catch (Exception ex) {
+                        + " disconnected: " + ex.getMessage(), "Server", "mainroom"));
+                users.set(userIndex, null); //set disconnected users in array as null
+            } catch (Exception ex) {
                 ex.printStackTrace();
             }
         }
@@ -70,6 +67,7 @@ public class ChatServer {
 
             while (true) {
                 Socket clientSocket = serverSock.accept();
+                //set up client input and output streams in new user objects
                 ObjectOutputStream writer = new ObjectOutputStream(clientSocket.getOutputStream());
                 ObjectInputStream reader = new ObjectInputStream(clientSocket.getInputStream());
                 User newUser = new User("user" + (users.size() + 1), writer, reader, clientSocket);
@@ -87,32 +85,39 @@ public class ChatServer {
     }
 
     public synchronized void broadcastMessage(Message message) {
-        for (User user : users) {
-            if (user.rooms.contains(message.getDestination())) {
-                try {
-                    user.outputStream.writeObject(message);
-                    user.outputStream.flush();
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+        for (int i = 0; i < users.size(); i++) {
+            if (users.get(i) != null) {
+                if (users.get(i).rooms.contains(message.getDestination())) {
+                    try {
+                        users.get(i).outputStream.writeObject(message);
+                        users.get(i).outputStream.flush();
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
                 }
             }
         }
     }
 
     public synchronized void sendMessage(int userIndex, Message message) {
-        try {
-            users.get(userIndex).outputStream.writeObject(message);
-            users.get(userIndex).outputStream.flush();
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        if (users.get(userIndex) != null) {
+            try {
+                users.get(userIndex).outputStream.writeObject(message);
+                users.get(userIndex).outputStream.flush();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
     }
 
     public synchronized void setName(int userIndex, String name) {
         for (int i = 0; i < users.size(); i++) {
-            if (users.get(i).getUsername().equals(name) && i != userIndex) {
-                sendMessage(userIndex, new Message("Name " + name + " is already taken.", "Server", "all"));
-                return;
+            if (users.get(i) != null) {
+                if (users.get(i).getUsername().equals(name) && i != userIndex) {
+                    sendMessage(userIndex, new Message("Name " + name + " is already taken.",
+                            "Server", "all"));
+                    return;
+                }
             }
         }
         users.get(userIndex).setUsername(name);

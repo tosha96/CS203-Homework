@@ -108,8 +108,6 @@ public class ChatClient {
             Message message;
             try {
                 while ((message = (Message) reader.readObject()) != null) {
-                    //message = (Message) reader.readObject();
-                    //System.out.println("read " + message.getContent());
                     if (message.getDestination().equals("mainroom") || message.getDestination().equals("all")) {
                         incoming.append(message.getUser() + ": " + message.getContent() + "\n");
                     }
