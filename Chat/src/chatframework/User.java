@@ -26,7 +26,7 @@ public class User {
         this.outputStream = outputStream;
         this.inputStream = inputStream;
         this.socket = socket;
-        this.rooms.add("mainroom");
+        this.rooms.add("testroom");
     }
     
     public String getUsername() {

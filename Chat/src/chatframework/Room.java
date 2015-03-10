@@ -5,10 +5,14 @@
  */
 package chatframework;
 
+import java.util.ArrayList;
+
 /**
  *
  * @author Aantokhin
  */
 public class Room {
+    private String name;
+    public ArrayList<Integer> users = new ArrayList<>();
     
 }

@@ -21,13 +21,16 @@ public class ChatClient {
 
     JTextArea incoming;
     JList userList;
+    JList roomList;
     JTextField outgoing;
     JTextField setName;
     ObjectInputStream reader;
     ObjectOutputStream writer;
     Socket sock;
-    Vector<String> users = new Vector<>();
     DefaultListModel usersModel = new DefaultListModel();
+    DefaultListModel roomsModel = new DefaultListModel();
+
+    ArrayList<RoomObject> roomObjects = new ArrayList<>();
 
     /**
      * @param args the command line arguments
@@ -37,6 +40,20 @@ public class ChatClient {
         client.go();
     }
 
+    MouseListener roomMouseListener = new MouseAdapter() {
+        public void mouseClicked(MouseEvent e) {
+            if (e.getClickCount() == 1) {
+                int index = roomList.locationToIndex(e.getPoint());
+                //System.out.println("Single clicked on Item " + index);
+                String roomName = (String) roomsModel.elementAt(index);
+                for (RoomObject room : roomObjects) {
+                    if (room.getName().equals(roomName)) {
+                        incoming = room.incoming;
+                    }
+                }
+            }
+        }
+    };
     public void go() {
         JFrame frame = new JFrame("Chat Client");
         JPanel mainPanel = new JPanel();
@@ -48,8 +65,17 @@ public class ChatClient {
         userList.setLayoutOrientation(JList.VERTICAL);
         userList.setVisibleRowCount(-1);
 
+        roomList = new JList(roomsModel);
+        roomList.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
+        roomList.setLayoutOrientation(JList.VERTICAL);
+        roomList.setVisibleRowCount(-1);
+        roomList.addMouseListener(roomMouseListener);
+
         JScrollPane userScroller = new JScrollPane(userList);
         userScroller.setPreferredSize(new Dimension(100, 500));
+
+        JScrollPane roomScroller = new JScrollPane(roomList);
+        roomScroller.setPreferredSize(new Dimension(100, 500));
 
         incoming = new JTextArea(15, 10);
         incoming.setLineWrap(true);
@@ -71,38 +97,49 @@ public class ChatClient {
 
         namePanel.add(setName);
         namePanel.add(setNameButton);
-        
+
         inputPanel.add(namePanel);
         inputPanel.add(outgoing);
         inputPanel.add(sendButton);
 
         frame.getContentPane().add(BorderLayout.CENTER, mainPanel);
         frame.getContentPane().add(BorderLayout.EAST, userScroller);
+        frame.getContentPane().add(BorderLayout.WEST, roomScroller);
         frame.getContentPane().add(BorderLayout.SOUTH, inputPanel);
 
-        setUpNetworking();
-        Thread readerThread = new Thread(new IncomingReader());
-        readerThread.start();
-        
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(800, 500);
         frame.setVisible(true);
+
+        while (!setUpNetworking()) {
+            try {
+                incoming.append("Connection failed, retrying..." + "\n");
+                Thread.sleep(1500);
+            } catch (Exception ex) {
+            }
+        }
+
+        Thread readerThread = new Thread(new IncomingReader());
+        readerThread.start();
     }
 
-    private void setUpNetworking() {
+    private boolean setUpNetworking() {
         try {
             sock = new Socket("127.0.0.1", 5000);
             reader = new ObjectInputStream(sock.getInputStream());
             writer = new ObjectOutputStream(sock.getOutputStream());
-            System.out.println("Networking established.");
+            incoming.append("Connected!" + "\n");
+            return true;
         } catch (IOException ex) {
-            ex.printStackTrace();
+            //ex.printStackTrace();
+            return false;
         }
 
     }
 
     public class SendButtonListener implements ActionListener {
 
+        @Override
         public void actionPerformed(ActionEvent ev) {
             try {
                 Message msg = new Message(outgoing.getText(), null, "mainroom");
@@ -118,6 +155,7 @@ public class ChatClient {
 
     public class SetNameButtonListener implements ActionListener {
 
+        @Override
         public void actionPerformed(ActionEvent ev) {
             try {
                 Message msg = new Message(setName.getText(), null, "setName");
@@ -136,17 +174,37 @@ public class ChatClient {
             Message message;
             try {
                 while ((message = (Message) reader.readObject()) != null) {
-                    if (message.getDestination().equals("mainroom") || message.getDestination().equals("all")) {
-                        incoming.append(message.getUser() + ": " + message.getContent() + "\n");
-                    } else if (message.getDestination().equals("userList")) {
-                        //update list of users
-                        String delims = "[,]";
-                        String[] tokens = message.getContent().split(delims);
-
-                        usersModel.clear();
-                        for (String user : tokens) {
-                            usersModel.addElement(user);
-                        }
+                    //variables for room/user message tokenization
+                    String delims = "[,]";
+                    String[] tokens = new String[0];
+                    switch (message.getDestination()) {
+                        case "mainroom":
+                        case "all":
+                            incoming.append(message.getUser() + ": " + message.getContent() + "\n");
+                            break;
+                        case "userList":
+                            //update list of users
+                            tokens = message.getContent().split(delims);
+                            usersModel.clear();
+                            for (String user : tokens) {
+                                usersModel.addElement(user);
+                            }
+                            break;
+                        case "roomList":
+                            //update list of rooms
+                            tokens = message.getContent().split(delims);
+                            roomsModel.clear();
+                            for (String room : tokens) {
+                                roomsModel.addElement(room);
+                            }
+                            break;
+                        default:
+                            for (RoomObject room : roomObjects) {
+                                if (room.getName().equals(message.getDestination())) {
+                                    room.incoming.append(message.getUser() + ": " + message.getContent() + "\n");
+                                }
+                            }
+                            break;
                     }
                 }
             } catch (Exception ex) {

@@ -48,8 +48,8 @@ public class ChatServer {
             } catch (SocketException ex) { //handles disconnected users
                 broadcastMessage(new Message(users.get(userIndex).getUsername() 
                         + " disconnected: " + ex.getMessage(), "Server", "mainroom"));
-                updateUserList();
                 users.set(userIndex, null); //set disconnected users in array as null
+                updateUserList();
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -164,5 +164,18 @@ public class ChatServer {
             }
         }
         broadcastMessage(new Message(userList, "Server", "userList"));
+    }
+    
+    public synchronized void updateRoomList() {
+        //sends list of rooms to client for room list panel
+        String roomList = "";
+        for (User user: users) {
+            if (user != null) {
+                for (String room : user.rooms) {
+                    roomList += room + ",";
+                }
+            }
+        }
+        broadcastMessage(new Message(roomList, "Server", "roomList"));
     }
 }
