@@ -17,7 +17,8 @@ import java.util.*;
 public class ChatServer {
 
     Vector<User> users = new Vector<>();
-    List serverMessages = Arrays.asList("userList", "test");
+    Vector<Room> rooms = new Vector<>();
+    List serverMessages = Arrays.asList("userList", "roomList");
 
     public class ClientHandler implements Runnable {
 
@@ -35,7 +36,7 @@ public class ChatServer {
         public void run() {
             Message message;
             try {
-                while ((message = (Message) users.get(userIndex).inputStream.readObject()) != null) {
+                while ((message = (Message) users.get(userIndex).getInputStream().readObject()) != null) {
                     message.setUser(users.get(userIndex).getUsername());
                     if (message.getDestination().equals("setName")) {
                         setName(userIndex, message.getContent());
@@ -46,8 +47,10 @@ public class ChatServer {
                     }
                 }
             } catch (SocketException ex) { //handles disconnected users
-                broadcastMessage(new Message(users.get(userIndex).getUsername() 
-                        + " disconnected: " + ex.getMessage(), "Server", "mainroom"));
+                for (String room : users.get(userIndex).getRooms()) {
+                    broadcastMessage(new Message(users.get(userIndex).getUsername() 
+                            + " disconnected: " + ex.getMessage(), "Server", room, "message"));
+                }
                 users.set(userIndex, null); //set disconnected users in array as null
                 updateUserList();
             } catch (Exception ex) {
@@ -65,6 +68,8 @@ public class ChatServer {
 
     public void go() {
         try {
+            rooms.add(new Room("mainroom"));
+            rooms.add(new Room("testroom"));
             ServerSocket serverSock = new ServerSocket(5000);
 
             while (true) {
@@ -97,8 +102,10 @@ public class ChatServer {
                 Thread t = new Thread(new ClientHandler(userIndex));
                 t.start();
                 //alert users of join
-                broadcastMessage(new Message(users.get(userIndex).getUsername() 
-                        + " has joined the room.", "Server", "mainroom"));
+                for (String room : users.get(userIndex).getRooms()) {
+                    broadcastMessage(new Message(users.get(userIndex).getUsername() 
+                            + " has joined the room.", "Server", room, "message"));
+                }
                 updateUserList();
             }
         } catch (Exception ex) {
@@ -111,11 +118,11 @@ public class ChatServer {
             if (users.get(i) != null) {
                 //check if users are in room that message is being sent to
                 //also check that it is not a server message
-                if (users.get(i).rooms.contains(message.getDestination()) || 
+                if (users.get(i).getRooms().contains(message.getDestination()) || 
                         serverMessages.contains(message.getDestination())) {
                     try {
-                        users.get(i).outputStream.writeObject(message);
-                        users.get(i).outputStream.flush();
+                        users.get(i).getOutputStream().writeObject(message);
+                        users.get(i).getOutputStream().flush();
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
@@ -127,8 +134,8 @@ public class ChatServer {
     public synchronized void sendMessage(int userIndex, Message message) {
         if (users.get(userIndex) != null) {
             try {
-                users.get(userIndex).outputStream.writeObject(message);
-                users.get(userIndex).outputStream.flush();
+                users.get(userIndex).getOutputStream().writeObject(message);
+                users.get(userIndex).getOutputStream().flush();
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -143,7 +150,7 @@ public class ChatServer {
                 if (users.get(i) != null) {
                     if (users.get(i).getUsername().equals(name) && i != userIndex) {
                         sendMessage(userIndex, new Message("Name " + name + " is already taken.",
-                                "Server", "all"));
+                                "Server", "current", "message"));
                         return;
                     }
                 }
@@ -151,19 +158,21 @@ public class ChatServer {
             users.get(userIndex).setUsername(name);
             updateUserList();
         } else {
-            sendMessage(userIndex, new Message("Name cannot be empty.", "Server", "all"));
+            sendMessage(userIndex, new Message("Name cannot be empty.", "Server", "current", "message"));
         }
     }
     
     public synchronized void updateUserList() {
         //sends list of users to client for user list panel
-        String userList = "";
-        for (User user: users) {
-            if (user != null) {
-                userList += user.getUsername() + ",";
+        for (Room room : rooms) {
+            String userList = "";
+            for (User user: users) {
+                if (user != null && user.getRooms().contains(room.getName())) {
+                    userList += user.getUsername() + ",";
+                }
             }
+            broadcastMessage(new Message(userList, "Server", room.getName(), "userList"));
         }
-        broadcastMessage(new Message(userList, "Server", "userList"));
     }
     
     public synchronized void updateRoomList() {
@@ -171,11 +180,11 @@ public class ChatServer {
         String roomList = "";
         for (User user: users) {
             if (user != null) {
-                for (String room : user.rooms) {
+                for (String room : user.getRooms()) {
                     roomList += room + ",";
                 }
             }
         }
-        broadcastMessage(new Message(roomList, "Server", "roomList"));
+        broadcastMessage(new Message(roomList, "Server", "roomList", "roomList"));
     }
 }

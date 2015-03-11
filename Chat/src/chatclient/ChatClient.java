@@ -19,7 +19,9 @@ import java.util.*;
  */
 public class ChatClient {
 
+    JFrame frame;
     JTextArea incoming;
+    JScrollPane qScroller;
     JList userList;
     JList roomList;
     JTextField outgoing;
@@ -31,6 +33,7 @@ public class ChatClient {
     DefaultListModel roomsModel = new DefaultListModel();
 
     ArrayList<RoomObject> roomObjects = new ArrayList<>();
+    int currentRoom = 0;
 
     /**
      * @param args the command line arguments
@@ -46,19 +49,27 @@ public class ChatClient {
                 int index = roomList.locationToIndex(e.getPoint());
                 //System.out.println("Single clicked on Item " + index);
                 String roomName = (String) roomsModel.elementAt(index);
-                for (RoomObject room : roomObjects) {
-                    if (room.getName().equals(roomName)) {
-                        incoming = room.incoming;
+                for (int i = 0; i < roomObjects.size(); i++) {
+                    if (roomObjects.get(i).getName().equals(roomName)) {
+                        incoming.setText(roomObjects.get(i).getText());
+                        currentRoom = i;
+                        incoming.repaint();
                     }
                 }
             }
         }
     };
+
     public void go() {
-        JFrame frame = new JFrame("Chat Client");
+        frame = new JFrame("Chat Client");
         JPanel mainPanel = new JPanel();
         JPanel inputPanel = new JPanel();
         JPanel namePanel = new JPanel();
+
+        roomObjects.add(new RoomObject("mainroom"));
+        roomObjects.add(new RoomObject("testroom"));
+        roomsModel.addElement("mainroom");
+        roomsModel.addElement("testroom");
 
         userList = new JList(usersModel);
         userList.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
@@ -80,8 +91,9 @@ public class ChatClient {
         incoming = new JTextArea(15, 10);
         incoming.setLineWrap(true);
         incoming.setEditable(false);
+        incoming.setText(roomObjects.get(currentRoom).getText());
 
-        JScrollPane qScroller = new JScrollPane(incoming);
+        qScroller = new JScrollPane(incoming);
         qScroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
         qScroller.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
@@ -113,7 +125,8 @@ public class ChatClient {
 
         while (!setUpNetworking()) {
             try {
-                incoming.append("Connection failed, retrying..." + "\n");
+
+                addToCurrentRoom("Connection failed, retrying..." + "\n");
                 Thread.sleep(1500);
             } catch (Exception ex) {
             }
@@ -128,7 +141,7 @@ public class ChatClient {
             sock = new Socket("127.0.0.1", 5000);
             reader = new ObjectInputStream(sock.getInputStream());
             writer = new ObjectOutputStream(sock.getOutputStream());
-            incoming.append("Connected!" + "\n");
+            addToCurrentRoom("Connected!" + "\n");
             return true;
         } catch (IOException ex) {
             //ex.printStackTrace();
@@ -142,7 +155,7 @@ public class ChatClient {
         @Override
         public void actionPerformed(ActionEvent ev) {
             try {
-                Message msg = new Message(outgoing.getText(), null, "mainroom");
+                Message msg = new Message(outgoing.getText(), null, roomObjects.get(currentRoom).getName(), "message");
                 writer.writeObject(msg);
                 writer.flush();
             } catch (Exception ex) {
@@ -153,12 +166,18 @@ public class ChatClient {
         }
     }
 
+    public void addToCurrentRoom(String content) {
+        roomObjects.get(currentRoom).setText(roomObjects.get(currentRoom).getText() + content);
+        incoming.setText(roomObjects.get(currentRoom).getText());
+        incoming.repaint();
+    }
+
     public class SetNameButtonListener implements ActionListener {
 
         @Override
         public void actionPerformed(ActionEvent ev) {
             try {
-                Message msg = new Message(setName.getText(), null, "setName");
+                Message msg = new Message(setName.getText(), null, "setName", "message");
                 writer.writeObject(msg);
                 writer.flush();
             } catch (Exception ex) {
@@ -177,34 +196,37 @@ public class ChatClient {
                     //variables for room/user message tokenization
                     String delims = "[,]";
                     String[] tokens = new String[0];
-                    switch (message.getDestination()) {
-                        case "mainroom":
-                        case "all":
-                            incoming.append(message.getUser() + ": " + message.getContent() + "\n");
-                            break;
-                        case "userList":
-                            //update list of users
-                            tokens = message.getContent().split(delims);
-                            usersModel.clear();
-                            for (String user : tokens) {
-                                usersModel.addElement(user);
-                            }
-                            break;
-                        case "roomList":
-                            //update list of rooms
-                            tokens = message.getContent().split(delims);
-                            roomsModel.clear();
-                            for (String room : tokens) {
-                                roomsModel.addElement(room);
-                            }
-                            break;
-                        default:
-                            for (RoomObject room : roomObjects) {
-                                if (room.getName().equals(message.getDestination())) {
-                                    room.incoming.append(message.getUser() + ": " + message.getContent() + "\n");
+                    if (message.getType().equals("message")) {
+                        switch (message.getDestination()) {
+                            case "current":
+                                addToCurrentRoom(message.getUser() + ": " + message.getContent() + "\n");
+                                incoming.repaint();
+                                break;
+                            case "roomList":
+                                //update list of rooms
+                                tokens = message.getContent().split(delims);
+                                roomsModel.clear();
+                                for (String room : tokens) {
+                                    roomsModel.addElement(room);
                                 }
-                            }
-                            break;
+                                break;
+                            default:
+                                //go through rooms and give them their appropriate messages
+                                for (RoomObject room : roomObjects) {
+                                    if (room.getName().equals(message.getDestination())) {
+                                        room.setText(room.getText() + message.getUser() + ": " + message.getContent() + "\n");
+                                        incoming.setText(room.getText());
+                                        incoming.repaint();
+                                    }
+                                }
+                                break;
+                        }
+                    } else if (message.getType().equals("userList")) {
+                        tokens = message.getContent().split(delims);
+                        usersModel.clear();
+                        for (String user : tokens) {
+                            usersModel.addElement(user);
+                        }
                     }
                 }
             } catch (Exception ex) {

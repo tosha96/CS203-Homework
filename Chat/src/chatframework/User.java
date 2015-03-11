@@ -16,10 +16,10 @@ import java.util.ArrayList;
  */
 public class User {
     private String username;
-    public ObjectOutputStream outputStream;
-    public ObjectInputStream inputStream;
-    public Socket socket;
-    public ArrayList<String> rooms = new ArrayList<>();
+    private ObjectOutputStream outputStream;
+    private ObjectInputStream inputStream;
+    private Socket socket;
+    private ArrayList<String> rooms = new ArrayList<>();
 
     public User(String username, ObjectOutputStream outputStream, ObjectInputStream inputStream, Socket socket) {
         this.username = username;
@@ -27,6 +27,7 @@ public class User {
         this.inputStream = inputStream;
         this.socket = socket;
         this.rooms.add("testroom");
+        this.rooms.add("mainroom");
     }
     
     public String getUsername() {
@@ -36,5 +37,38 @@ public class User {
     public void setUsername(String username) {
         this.username = username;
     }
+
+    public ObjectOutputStream getOutputStream() {
+        return outputStream;
+    }
+
+    public void setOutputStream(ObjectOutputStream outputStream) {
+        this.outputStream = outputStream;
+    }
+
+    public ObjectInputStream getInputStream() {
+        return inputStream;
+    }
+
+    public void setInputStream(ObjectInputStream inputStream) {
+        this.inputStream = inputStream;
+    }
+
+    public Socket getSocket() {
+        return socket;
+    }
+
+    public void setSocket(Socket socket) {
+        this.socket = socket;
+    }
+
+    public ArrayList<String> getRooms() {
+        return rooms;
+    }
+
+    public void setRooms(ArrayList<String> rooms) {
+        this.rooms = rooms;
+    }
+    
     
 }

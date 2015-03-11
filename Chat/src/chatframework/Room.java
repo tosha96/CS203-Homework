@@ -13,6 +13,18 @@ import java.util.ArrayList;
  */
 public class Room {
     private String name;
-    public ArrayList<Integer> users = new ArrayList<>();
+    //private ArrayList<Integer> users = new ArrayList<>();
+
+    public Room(String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
     
 }

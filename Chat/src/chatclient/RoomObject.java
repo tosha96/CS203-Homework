@@ -20,30 +20,12 @@ import javax.swing.ScrollPaneConstants;
 public class RoomObject {
 
     private String name;
-    public JTextArea incoming;
-    public JList userList;
-    public DefaultListModel usersModel = new DefaultListModel();
-    public JScrollPane userScroller;
-    public JScrollPane qScroller;
+    private String text = "";
+    private DefaultListModel usersModel = new DefaultListModel();
+
 
     public RoomObject(String name) {
         this.name = name;
-                
-        userList = new JList(usersModel);
-        userList.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
-        userList.setLayoutOrientation(JList.VERTICAL);
-        userList.setVisibleRowCount(-1);
-
-        userScroller = new JScrollPane(userList);
-        userScroller.setPreferredSize(new Dimension(100, 500));
-
-        incoming = new JTextArea(15, 10);
-        incoming.setLineWrap(true);
-        incoming.setEditable(false);
-
-        qScroller = new JScrollPane(incoming);
-        qScroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
-        qScroller.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
     }
 
     public String getName() {
@@ -53,5 +35,22 @@ public class RoomObject {
     public void setName(String name) {
         this.name = name;
     }
+
+    public String getText() {
+        return text;
+    }
+
+    public void setText(String text) {
+        this.text = text;
+    }
+
+    public DefaultListModel getUsersModel() {
+        return usersModel;
+    }
+
+    public void setUsersModel(DefaultListModel usersModel) {
+        this.usersModel = usersModel;
+    }
+
     
 }
