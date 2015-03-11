@@ -12,6 +12,8 @@ import java.awt.event.*;
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
 /**
  *
@@ -30,9 +32,8 @@ public class ChatClient {
     ObjectOutputStream writer;
     Socket sock;
     DefaultListModel usersModel = new DefaultListModel();
-    DefaultListModel roomsModel = new DefaultListModel();
+    DefaultListModel<RoomObject> roomsModel = new DefaultListModel();
 
-    ArrayList<RoomObject> roomObjects = new ArrayList<>();
     int currentRoom = 0;
 
     /**
@@ -43,22 +44,30 @@ public class ChatClient {
         client.go();
     }
 
-    MouseListener roomMouseListener = new MouseAdapter() {
-        public void mouseClicked(MouseEvent e) {
-            if (e.getClickCount() == 1) {
-                int index = roomList.locationToIndex(e.getPoint());
-                //System.out.println("Single clicked on Item " + index);
-                String roomName = (String) roomsModel.elementAt(index);
-                for (int i = 0; i < roomObjects.size(); i++) {
-                    if (roomObjects.get(i).getName().equals(roomName)) {
-                        incoming.setText(roomObjects.get(i).getText());
-                        currentRoom = i;
+    ListSelectionListener roomListener = new ListSelectionListener() {
+        @Override
+        public void valueChanged(ListSelectionEvent lse) {
+            if (!lse.getValueIsAdjusting()) {
+                RoomObject room = (RoomObject) roomList.getSelectedValue();
+                int roomIndex = roomList.getMinSelectionIndex();
+                        incoming.setText(room.getText());
+
+                        updateRoomUsers(roomIndex);
+
+                        currentRoom = roomIndex;
                         incoming.repaint();
-                    }
-                }
+                        userList.repaint();
             }
         }
     };
+
+    public void updateRoomUsers(int index) {
+        //index is the index of the room we are updating
+        usersModel.clear();
+        for (Object roomUserModel : roomsModel.get(index).getUsersModel().toArray()) {
+            usersModel.addElement(roomUserModel);
+        }
+    }
 
     public void go() {
         frame = new JFrame("Chat Client");
@@ -66,21 +75,22 @@ public class ChatClient {
         JPanel inputPanel = new JPanel();
         JPanel namePanel = new JPanel();
 
-        roomObjects.add(new RoomObject("mainroom"));
-        roomObjects.add(new RoomObject("testroom"));
-        roomsModel.addElement("mainroom");
-        roomsModel.addElement("testroom");
+        //roomObjects.add(new RoomObject("mainroom"));
+        //roomObjects.add(new RoomObject("testroom"));
+        roomsModel.addElement(new RoomObject("mainroom"));
+        roomsModel.addElement(new RoomObject("testroom"));
 
         userList = new JList(usersModel);
-        userList.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
+        userList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         userList.setLayoutOrientation(JList.VERTICAL);
         userList.setVisibleRowCount(-1);
 
         roomList = new JList(roomsModel);
-        roomList.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
+        roomList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         roomList.setLayoutOrientation(JList.VERTICAL);
         roomList.setVisibleRowCount(-1);
-        roomList.addMouseListener(roomMouseListener);
+        roomList.setSelectedIndex(0);
+        roomList.addListSelectionListener(roomListener);
 
         JScrollPane userScroller = new JScrollPane(userList);
         userScroller.setPreferredSize(new Dimension(100, 500));
@@ -91,7 +101,7 @@ public class ChatClient {
         incoming = new JTextArea(15, 10);
         incoming.setLineWrap(true);
         incoming.setEditable(false);
-        incoming.setText(roomObjects.get(currentRoom).getText());
+        incoming.setText(roomsModel.get(currentRoom).getText());
 
         qScroller = new JScrollPane(incoming);
         qScroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
@@ -155,7 +165,7 @@ public class ChatClient {
         @Override
         public void actionPerformed(ActionEvent ev) {
             try {
-                Message msg = new Message(outgoing.getText(), null, roomObjects.get(currentRoom).getName(), "message");
+                Message msg = new Message(outgoing.getText(), null, roomsModel.get(currentRoom).getName(), "message");
                 writer.writeObject(msg);
                 writer.flush();
             } catch (Exception ex) {
@@ -167,8 +177,8 @@ public class ChatClient {
     }
 
     public void addToCurrentRoom(String content) {
-        roomObjects.get(currentRoom).setText(roomObjects.get(currentRoom).getText() + content);
-        incoming.setText(roomObjects.get(currentRoom).getText());
+        roomsModel.get(currentRoom).setText(roomsModel.get(currentRoom).getText() + content);
+        incoming.setText(roomsModel.get(currentRoom).getText());
         incoming.repaint();
     }
 
@@ -196,37 +206,48 @@ public class ChatClient {
                     //variables for room/user message tokenization
                     String delims = "[,]";
                     String[] tokens = new String[0];
-                    if (message.getType().equals("message")) {
-                        switch (message.getDestination()) {
-                            case "current":
-                                addToCurrentRoom(message.getUser() + ": " + message.getContent() + "\n");
-                                incoming.repaint();
-                                break;
-                            case "roomList":
-                                //update list of rooms
-                                tokens = message.getContent().split(delims);
-                                roomsModel.clear();
-                                for (String room : tokens) {
-                                    roomsModel.addElement(room);
-                                }
-                                break;
-                            default:
-                                //go through rooms and give them their appropriate messages
-                                for (RoomObject room : roomObjects) {
-                                    if (room.getName().equals(message.getDestination())) {
-                                        room.setText(room.getText() + message.getUser() + ": " + message.getContent() + "\n");
-                                        incoming.setText(room.getText());
-                                        incoming.repaint();
+                    switch (message.getType()) {
+                        case "message":
+                            switch (message.getDestination()) {
+                                case "current":
+                                    addToCurrentRoom(message.getUser() + ": " + message.getContent() + "\n");
+                                    incoming.repaint();
+                                    break;
+                                case "roomList":
+                                    //update list of rooms
+                                    tokens = message.getContent().split(delims);
+                                    roomsModel.clear();
+                                    for (String room : tokens) {
+                                        //roomsModel.addElement(room);
                                     }
+                                    break;
+                                default:
+                                    //go through rooms and give them their appropriate messages
+                                    for (int i = 0; i < roomsModel.size(); i++) {
+                                        if (roomsModel.get(i).getName().equals(message.getDestination())) {
+                                            roomsModel.get(i).setText(roomsModel.get(i).getText() + message.getUser() + ": " + message.getContent() + "\n");
+                                            incoming.setText(roomsModel.get(i).getText());
+                                            incoming.repaint();
+                                        }
+                                    }
+                                    break;
+                            }
+                            break;
+                        case "userList":
+                            tokens = message.getContent().split(delims);
+                            DefaultListModel model = new DefaultListModel();
+                            model.clear();
+                            for (String user : tokens) {
+                                model.addElement(user);
+                            }
+                            for (int i = 0; i < roomsModel.size(); i++) {
+                                //find the right room to update list for
+                                if (roomsModel.get(i).getName().equals(message.getDestination())) {
+                                    roomsModel.get(i).setUsersModel(model);
                                 }
-                                break;
-                        }
-                    } else if (message.getType().equals("userList")) {
-                        tokens = message.getContent().split(delims);
-                        usersModel.clear();
-                        for (String user : tokens) {
-                            usersModel.addElement(user);
-                        }
+                            }
+                            updateRoomUsers(currentRoom);
+                            break;
                     }
                 }
             } catch (Exception ex) {

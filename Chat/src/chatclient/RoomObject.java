@@ -52,5 +52,8 @@ public class RoomObject {
         this.usersModel = usersModel;
     }
 
-    
+    @Override
+    public String toString() {
+        return this.name;
+    }
 }
