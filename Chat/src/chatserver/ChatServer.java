@@ -38,8 +38,25 @@ public class ChatServer {
             try {
                 while ((message = (Message) users.get(userIndex).getInputStream().readObject()) != null) {
                     message.setUser(users.get(userIndex).getUsername());
-                    if (message.getDestination().equals("setName")) {
+                    if (message.getType().equals("setName")) {
                         setName(userIndex, message.getContent());
+                    //room user state update logic
+                    } else if (message.getType().equals("roomState")){
+                        if (message.getContent().equals("join")) {
+                            if (users.get(userIndex).getRooms().contains(message.getDestination())) {
+                                
+                            }
+                        } else if (message.getContent().equals("leave")) {
+                            //on leave, remove room from user room array and notify clients
+                            if (users.get(userIndex).getRooms().contains(message.getDestination())) {
+                                sendMessage(userIndex, new Message("leave","Server",message.getDestination(), "roomState"));
+                                Thread.sleep(50);
+                                users.get(userIndex).getRooms().remove(message.getDestination());
+                                broadcastMessage(new Message(users.get(userIndex).getUsername() 
+                                    + " disconnected: Left room", "Server", message.getDestination(), "message"));
+                                updateUserList();
+                            }
+                        }
                     } else {
                         if (message.getUser().equals(users.get(userIndex).getUsername())) {
                             broadcastMessage(message);
@@ -163,6 +180,7 @@ public class ChatServer {
     }
     
     public synchronized void updateUserList() {
+        //need to make individualized for rooms, needs room parameter
         //sends list of users to client for user list panel
         for (Room room : rooms) {
             String userList = "";
