@@ -11,7 +11,6 @@ import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
 import java.net.*;
-import java.util.*;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
@@ -26,7 +25,7 @@ public class ChatClient {
     JMenuItem menuItem;
 
     JFrame frame;
-    JTextArea incoming;
+    JTextPane incoming;
     JScrollPane qScroller;
     JList userList;
     JList roomList;
@@ -37,6 +36,7 @@ public class ChatClient {
     Socket sock;
     DefaultListModel usersModel = new DefaultListModel();
     DefaultListModel<RoomObject> roomsModel = new DefaultListModel();
+    JPanel noWrapPanel;
 
     int currentRoom = 0;
 
@@ -62,7 +62,8 @@ public class ChatClient {
                     currentRoom = roomIndex;
                     incoming.repaint();
                     userList.repaint();
-                } catch (Exception ex) {}
+                } catch (Exception ex) {
+                }
             }
         }
     };
@@ -72,6 +73,7 @@ public class ChatClient {
         JPanel mainPanel = new JPanel();
         JPanel inputPanel = new JPanel();
         JPanel namePanel = new JPanel();
+        noWrapPanel = new JPanel(new BorderLayout());
 
         menuBar = new JMenuBar();
         roomMenu = new JMenu("Room");
@@ -115,14 +117,16 @@ public class ChatClient {
         JScrollPane roomScroller = new JScrollPane(roomList);
         roomScroller.setPreferredSize(new Dimension(100, 500));
 
-        incoming = new JTextArea(15, 10);
-        incoming.setLineWrap(true);
+        incoming = new JTextPane();
+        //incoming.setLineWrap(true);
         incoming.setEditable(false);
         incoming.setText(roomsModel.get(currentRoom).getText());
+        noWrapPanel.add(incoming);
 
-        qScroller = new JScrollPane(incoming);
+        qScroller = new JScrollPane(noWrapPanel);
         qScroller.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS);
         qScroller.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        qScroller.setViewportView(incoming);
 
         outgoing = new JTextField(20);
         setName = new JTextField(10);
@@ -206,7 +210,7 @@ public class ChatClient {
             usersModel.addElement(roomUserModel);
         }
     }
-    
+
     public class SetNameButtonListener implements ActionListener {
 
         @Override
@@ -232,12 +236,39 @@ public class ChatClient {
                         writer.writeObject(msg);
                         writer.flush();
                         break;
+                    case "Join new room":
+                        RoomEntry roomEntry = new RoomEntry();
+                        roomEntry.joinButton.addActionListener(new JoinButtonListener(roomEntry));
+                        break;
                 }
                 System.out.println(ev.getActionCommand());
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
         }
+    }
+
+    public class JoinButtonListener implements ActionListener {
+        RoomEntry roomEntry;
+        
+        //let it know which roomentry object to listen on
+        public JoinButtonListener (RoomEntry roomEntry) {
+            this.roomEntry = roomEntry;
+        }
+        
+        @Override
+        public void actionPerformed(ActionEvent ae) {
+            try {
+                Message msg = new Message("join", null, roomEntry.roomName.getText(), "roomState");
+                writer.writeObject(msg);
+                writer.flush();
+                roomEntry.dispatchEvent(new WindowEvent(roomEntry, WindowEvent.WINDOW_CLOSING));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+
+        }
+
     }
 
     public class IncomingReader implements Runnable {
@@ -300,6 +331,7 @@ public class ChatClient {
                                 for (int i = 0; i < roomsModel.size(); i++) {
                                     //find the right room to update list for
                                     if (roomsModel.get(i).getName().equals(message.getDestination())) {
+                                        //copy old room list
                                         DefaultListModel<RoomObject> oldModel = new DefaultListModel();
                                         for (Object room : roomsModel.toArray()) {
                                             oldModel.addElement((RoomObject) room);
@@ -311,15 +343,21 @@ public class ChatClient {
                                             }
                                         }
                                         //roomsModel.removeElementAt(i);
-                                        currentRoom = 0;
                                         
-                                        incoming.setText(roomsModel.get(currentRoom).getText());
-                                        incoming.repaint();
-                                        updateRoomUsers(currentRoom);
-                                        System.out.println("test");
+                                        roomList.setSelectedIndex(0);
+                                        
+                                        //incoming.setText(roomsModel.get(currentRoom).getText());
+                                        //incoming.repaint();
+                                        //updateRoomUsers(currentRoom);
+                                        //System.out.println("test");
                                         break;
                                     }
                                 }
+                            } else if (message.getContent().equals("join")) {
+                                RoomObject room = new RoomObject(message.getDestination());
+                                roomsModel.addElement(room);
+                                //set focus to new room
+                                roomList.setSelectedIndex(roomsModel.lastIndexOf(room));
                             }
                             break;
                     }

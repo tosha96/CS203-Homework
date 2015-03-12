@@ -5,13 +5,7 @@
  */
 package chatclient;
 
-import java.awt.Dimension;
 import javax.swing.DefaultListModel;
-import javax.swing.JList;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.ListSelectionModel;
-import javax.swing.ScrollPaneConstants;
 
 /**
  *
@@ -56,4 +50,5 @@ public class RoomObject {
     public String toString() {
         return this.name;
     }
+    
 }

@@ -40,20 +40,36 @@ public class ChatServer {
                     message.setUser(users.get(userIndex).getUsername());
                     if (message.getType().equals("setName")) {
                         setName(userIndex, message.getContent());
-                    //room user state update logic
-                    } else if (message.getType().equals("roomState")){
+                        //room user state update logic
+                    } else if (message.getType().equals("roomState")) {
                         if (message.getContent().equals("join")) {
-                            if (users.get(userIndex).getRooms().contains(message.getDestination())) {
-                                
+                            boolean isCreated = false;
+                            //iterate over existing rooms to check if the room 
+                            //that the user wants has been created yet
+                            for (Room room : rooms) {
+                                if (room.getName().equals(message.getDestination())) {
+                                    isCreated = true;
+                                }
                             }
+                            //create room if it's not created yet
+                            if (!isCreated) {
+                                rooms.add(new Room(message.getDestination()));
+                            }
+                            
+                            sendMessage(userIndex, new Message("join", "Server", message.getDestination(), "roomState"));
+                            Thread.sleep(50);//allow client time to get message
+                            users.get(userIndex).getRooms().add(message.getDestination());
+                            broadcastMessage(new Message(users.get(userIndex).getUsername()
+                                    + " has joined the room.", "Server", message.getDestination(), "message"));
+                            updateUserList();
                         } else if (message.getContent().equals("leave")) {
                             //on leave, remove room from user room array and notify clients
                             if (users.get(userIndex).getRooms().contains(message.getDestination())) {
-                                sendMessage(userIndex, new Message("leave","Server",message.getDestination(), "roomState"));
-                                Thread.sleep(50);
+                                sendMessage(userIndex, new Message("leave", "Server", message.getDestination(), "roomState"));
+                                Thread.sleep(50);//allow client time to get message
                                 users.get(userIndex).getRooms().remove(message.getDestination());
-                                broadcastMessage(new Message(users.get(userIndex).getUsername() 
-                                    + " disconnected: Left room", "Server", message.getDestination(), "message"));
+                                broadcastMessage(new Message(users.get(userIndex).getUsername()
+                                        + " disconnected: Left room", "Server", message.getDestination(), "message"));
                                 updateUserList();
                             }
                         }
@@ -65,7 +81,7 @@ public class ChatServer {
                 }
             } catch (SocketException ex) { //handles disconnected users
                 for (String room : users.get(userIndex).getRooms()) {
-                    broadcastMessage(new Message(users.get(userIndex).getUsername() 
+                    broadcastMessage(new Message(users.get(userIndex).getUsername()
                             + " disconnected: " + ex.getMessage(), "Server", room, "message"));
                 }
                 users.set(userIndex, null); //set disconnected users in array as null
@@ -96,7 +112,7 @@ public class ChatServer {
                 ObjectInputStream reader = new ObjectInputStream(clientSocket.getInputStream());
                 User newUser = new User("user", writer, reader, clientSocket);
                 //set default name with user index
-                
+
                 //check for any empty slots in vector and if available,
                 //use them instead of creating a new one
                 boolean isCreated = false;
@@ -113,14 +129,14 @@ public class ChatServer {
                     //set default username #
                     newUser.setUsername(newUser.getUsername() + (users.size() + 1));
                     users.add(newUser);
-                }                
+                }
 
                 int userIndex = users.indexOf(newUser);
                 Thread t = new Thread(new ClientHandler(userIndex));
                 t.start();
                 //alert users of join
                 for (String room : users.get(userIndex).getRooms()) {
-                    broadcastMessage(new Message(users.get(userIndex).getUsername() 
+                    broadcastMessage(new Message(users.get(userIndex).getUsername()
                             + " has joined the room.", "Server", room, "message"));
                 }
                 updateUserList();
@@ -135,8 +151,8 @@ public class ChatServer {
             if (users.get(i) != null) {
                 //check if users are in room that message is being sent to
                 //also check that it is not a server message
-                if (users.get(i).getRooms().contains(message.getDestination()) || 
-                        serverMessages.contains(message.getDestination())) {
+                if (users.get(i).getRooms().contains(message.getDestination())
+                        || serverMessages.contains(message.getDestination())) {
                     try {
                         users.get(i).getOutputStream().writeObject(message);
                         users.get(i).getOutputStream().flush();
@@ -178,13 +194,13 @@ public class ChatServer {
             sendMessage(userIndex, new Message("Name cannot be empty.", "Server", "current", "message"));
         }
     }
-    
+
     public synchronized void updateUserList() {
         //need to make individualized for rooms, needs room parameter
         //sends list of users to client for user list panel
         for (Room room : rooms) {
             String userList = "";
-            for (User user: users) {
+            for (User user : users) {
                 if (user != null && user.getRooms().contains(room.getName())) {
                     userList += user.getUsername() + ",";
                 }
@@ -192,11 +208,11 @@ public class ChatServer {
             broadcastMessage(new Message(userList, "Server", room.getName(), "userList"));
         }
     }
-    
+
     public synchronized void updateRoomList() {
         //sends list of rooms to client for room list panel
         String roomList = "";
-        for (User user: users) {
+        for (User user : users) {
             if (user != null) {
                 for (String room : user.getRooms()) {
                     roomList += room + ",";
