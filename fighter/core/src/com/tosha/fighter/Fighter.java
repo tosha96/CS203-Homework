@@ -2,6 +2,7 @@ package com.tosha.fighter;
 
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
@@ -17,34 +18,21 @@ public class Fighter extends ApplicationAdapter {
     Box2DDebugRenderer debugRenderer;
     World world;
     OrthographicCamera camera;
-    Body body;
     Body groundBody;
+    Player player;
 
     @Override
     public void create() {
         //batch = new SpriteBatch();
         //img = new Texture("badlogic.jpg");
         Box2D.init();
-        world = new World(new Vector2(0, -20), true);
+        world = new World(new Vector2(0, 0), true);
         debugRenderer = new Box2DDebugRenderer();
         camera = new OrthographicCamera();
-        //camera.setToOrtho(false, 800, 480);
-        BodyDef bodyDef = new BodyDef();
-        bodyDef.type = BodyType.DynamicBody;
-        bodyDef.position.set(100, 300);
-        body = world.createBody(bodyDef);
-
-        CircleShape circle = new CircleShape();
-        circle.setRadius(12f);
-
-        FixtureDef fixtureDef = new FixtureDef();
-        fixtureDef.shape = circle;
-        fixtureDef.density = 3.0f;
-        fixtureDef.friction = 0.4f;
-        fixtureDef.restitution = 0.6f; // Make it bounce a little bit
-
-        Fixture fixture = body.createFixture(fixtureDef);
-
+        camera.setToOrtho(false, 800, 480);
+        
+        player = new Player(world);
+        
         BodyDef groundBodyDef = new BodyDef();
         groundBodyDef.position.set(new Vector2(0, 10));
 
@@ -54,12 +42,51 @@ public class Fighter extends ApplicationAdapter {
         groundBox.setAsBox(camera.viewportWidth, 10.0f);
         groundBody.createFixture(groundBox, 0.0f);
         groundBox.dispose();
-
-        circle.dispose();
     }
 
     @Override
     public void render() {
+        Vector2 vel = player.getBody().getLinearVelocity();
+        Vector2 pos = player.getBody().getPosition();
+        float ang = player.getBody().getAngularVelocity();
+
+        //WASD to move
+        if (Gdx.input.isKeyPressed(Keys.A) && vel.x > -player.getMaxVelocityX()) {
+            this.player.getBody().applyLinearImpulse(-player.getSpeedX(), 0, pos.x, pos.y, true);
+        }
+
+        if (Gdx.input.isKeyPressed(Keys.D) && vel.x < player.getMaxVelocityX()) {
+            this.player.getBody().applyLinearImpulse(player.getSpeedX(), 0, pos.x, pos.y, true);
+        }
+        
+        if (Gdx.input.isKeyPressed(Keys.S) && vel.y > -player.getMaxVelocityY()) {
+            this.player.getBody().applyLinearImpulse(0, -player.getSpeedY(), pos.x, pos.y, true);
+        }
+
+        if (Gdx.input.isKeyPressed(Keys.W) && vel.y < player.getMaxVelocityY()) {
+            this.player.getBody().applyLinearImpulse(0, player.getSpeedY(), pos.x, pos.y, true);
+        }
+        
+        if (Gdx.input.isKeyPressed(Keys.Q) && ang < player.getMaxVelocityAngular()) {
+            this.player.getBody().applyAngularImpulse(player.getSpeedAngular(), true);
+        }
+        
+        if (Gdx.input.isKeyPressed(Keys.E) && ang > -player.getMaxVelocityAngular()) {
+            this.player.getBody().applyAngularImpulse(-player.getSpeedAngular(), true);
+        }
+        
+        //X breaks
+        if (Gdx.input.isKeyPressed(Keys.X)) {
+            if (vel.y > 0) this.player.getBody().applyLinearImpulse(0, -player.getBreakSpeedX(), pos.x, pos.y, true);
+            else if (vel.y < 0) this.player.getBody().applyLinearImpulse(0, player.getBreakSpeedX(), pos.x, pos.y, true);
+            
+            if (vel.x > 0) this.player.getBody().applyLinearImpulse(-player.getBreakSpeedY(), 0, pos.x, pos.y, true);
+            else if (vel.x < 0) this.player.getBody().applyLinearImpulse(player.getBreakSpeedY(), 0, pos.x, pos.y, true);
+            
+            if (ang > 0) this.player.getBody().applyAngularImpulse(-player.getBreakSpeedAngular(), true);
+            else if (ang < 0) this.player.getBody().applyAngularImpulse(player.getBreakSpeedAngular(), true);
+        }
+
         world.step(1 / 45f, 6, 2);
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -72,3 +99,4 @@ public class Fighter extends ApplicationAdapter {
 }
 
 //https://github.com/libgdx/libgdx/wiki/Box2d
+//http://www.gabrielgambetta.com/fpm3.html
