@@ -13,7 +13,9 @@ import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
 import com.badlogic.gdx.utils.Array;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.net.*;
+import java.nio.ByteBuffer;
 
 public class Fighter extends ApplicationAdapter {
 
@@ -44,6 +46,10 @@ public class Fighter extends ApplicationAdapter {
     InetAddress address;
     byte[] buffer = new byte[256];
     DatagramPacket packet;
+    ByteBuffer wrapped;
+    int sequence;
+    int ack;
+    BitSet ackField = new BitSet(32);
     
     static final int protocolID = 68742731;
 
@@ -142,10 +148,28 @@ public class Fighter extends ApplicationAdapter {
 
         if (Gdx.input.isKeyPressed(Keys.O)) {
             try {
-                buffer = "echo".getBytes();
-                DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, 4445);
+                sequence += 1;
+                wrapped = ByteBuffer.wrap(buffer);
+                
+                wrapped.putInt(protocolID);
+                wrapped.position(wrapped.position() + 4);
+                wrapped.putInt(sequence);
+                wrapped.position(wrapped.position() + 4);
+                wrapped.putInt(ack);
+                wrapped.position(wrapped.position() + 4);
+                wrapped.put(ackField.toByteArray());
+                
+                byte[] echo = "echo".getBytes();
+                wrapped.put(echo);
+                
+                //buffer = "echo".getBytes();
+                //String received = new String(buffer, 0, buffer.length);
+                //Gdx.app.log("UDP Message", received);
+                packet = new DatagramPacket(buffer, buffer.length, address, 4445);
                 socket.send(packet);
-            } catch (Exception ex) {}
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
 
         world.step(1 / 45f, 6, 2);
@@ -230,17 +254,26 @@ public class Fighter extends ApplicationAdapter {
     };
 
     public class IncomingReader implements Runnable {
-
+        DatagramPacket packet;
+        ByteBuffer wrapped;
+        byte[] inBytes = new byte[30];
+        
         @Override
         public void run() {
             try {
                 while (true) {
                     packet = new DatagramPacket(buffer, buffer.length);
                     socket.receive(packet);
-                    String received = new String(packet.getData(), 0, packet.getLength());
-                    Gdx.app.log("UDP Message", received);
+                    wrapped = ByteBuffer.wrap(packet.getData());
+                    if (wrapped.getInt(0) == protocolID) {
+                        wrapped.position(4);
+                        wrapped.get(inBytes);
+                        String received = new String(inBytes, 0, inBytes.length);
+                        Gdx.app.log("UDP Message", received);
+                    }
                 }
             } catch (Exception ex) {
+                ex.printStackTrace();
             }
         }
 
