@@ -13,6 +13,7 @@ import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
 import com.badlogic.gdx.utils.Array;
 import java.util.ArrayList;
+import java.net.*;
 
 public class Fighter extends ApplicationAdapter {
 
@@ -39,8 +40,23 @@ public class Fighter extends ApplicationAdapter {
     float stateTime;
     Array<Body> bodies = new Array<Body>();
 
+    DatagramSocket socket;
+    InetAddress address;
+    byte[] buffer = new byte[256];
+    DatagramPacket packet;
+    
+    static final int protocolID = 68742731;
+
     @Override
     public void create() {
+        try {
+            socket = new DatagramSocket();
+            address = InetAddress.getByName("127.0.0.1");
+            Thread readerThread = new Thread(new IncomingReader());
+            readerThread.start();
+        } catch (Exception ex) {
+        }
+
         playerSheet = new Texture(Gdx.files.internal("fighterspritesheet.png"));
         TextureRegion[][] tmp = TextureRegion.split(playerSheet, playerSheet.getWidth() / FRAME_COLS, playerSheet.getHeight() / FRAME_ROWS);              // #10
         walkFrames = new TextureRegion[3];
@@ -85,7 +101,7 @@ public class Fighter extends ApplicationAdapter {
         groundBody.createFixture(fixtureDef);
         groundBody.setUserData(new BodyData("ground", groundBody.getPosition().x, groundBody.getPosition().y));
         groundBox.dispose();
-        
+
     }
 
     @Override
@@ -122,6 +138,14 @@ public class Fighter extends ApplicationAdapter {
 
         if (Gdx.input.isKeyPressed(Keys.W) && vel.y < player.getMaxVelocityY()) {
             this.player.getBody().applyLinearImpulse(0, player.getSpeedY(), pos.x, pos.y, true);
+        }
+
+        if (Gdx.input.isKeyPressed(Keys.O)) {
+            try {
+                buffer = "echo".getBytes();
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length, address, 4445);
+                socket.send(packet);
+            } catch (Exception ex) {}
         }
 
         world.step(1 / 45f, 6, 2);
@@ -204,6 +228,23 @@ public class Fighter extends ApplicationAdapter {
             //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
         }
     };
+
+    public class IncomingReader implements Runnable {
+
+        @Override
+        public void run() {
+            try {
+                while (true) {
+                    packet = new DatagramPacket(buffer, buffer.length);
+                    socket.receive(packet);
+                    String received = new String(packet.getData(), 0, packet.getLength());
+                    Gdx.app.log("UDP Message", received);
+                }
+            } catch (Exception ex) {
+            }
+        }
+
+    }
 }
 
 //https://github.com/libgdx/libgdx/wiki/Box2d
