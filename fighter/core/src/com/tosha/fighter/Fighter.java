@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.net.*;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -51,8 +52,8 @@ public class Fighter extends ApplicationAdapter {
     ByteBuffer wrapped;
     int sequence;
     int ack;
-    BitSet localAckSet = new BitSet(32);
-    BitSet remoteAckSet = new BitSet(32);
+    boolean[] localAckSet = new boolean[32];
+    boolean[] remoteAckSet = new boolean[32];
     ArrayBlockingQueue<DatagramPacket> inPackets = new ArrayBlockingQueue<DatagramPacket>(33);
     ArrayBlockingQueue<DatagramPacket> outPackets = new ArrayBlockingQueue<DatagramPacket>(33);
 
@@ -161,7 +162,11 @@ public class Fighter extends ApplicationAdapter {
                 wrapped.position(wrapped.position() + 4);
                 wrapped.putInt(ack);
                 wrapped.position(wrapped.position() + 4);
-                wrapped.put(getLocalAckSet().toByteArray());
+                BitSet tempBitSet = new BitSet();
+                for (int i = 0; i < getLocalAckSet().length; i++) {
+                    tempBitSet.set(i, getLocalAckSet()[i]); //convert from boolean[] to bitset
+                }
+                wrapped.put(tempBitSet.toByteArray()); //its okay to write the whole bitset because the bitset > 32 is just zeroes
                 wrapped.position(wrapped.position() + 4);
 
                 byte[] echo = "echo".getBytes();
@@ -263,12 +268,12 @@ public class Fighter extends ApplicationAdapter {
         //these are used for reciving, those are used for sending
         DatagramPacket packet;
         ByteBuffer wrapped;
-        byte[] remoteAckBytes = new byte[32];
+        byte[] remoteAckBytes = new byte[4];
         int remoteSequence; // the server's remote sequence int that we recieve
         int sequenceDifference; // the difference between the remote and local sequence
         int bitIndex; // the index in the bitfield for the packet we are going to set
         int remoteAck;
-        BitSet tmpField = new BitSet(32);
+        boolean[] tmpSet = new boolean[32];
 
         @Override
         public void run() {
@@ -277,54 +282,64 @@ public class Fighter extends ApplicationAdapter {
                     packet = new DatagramPacket(buffer, buffer.length);
                     socket.receive(packet);
                     wrapped = ByteBuffer.wrap(packet.getData());
-                    if (wrapped.getInt(0) == protocolID) {
+                    wrapped.position(0);
+
+                    if (wrapped.getInt() == protocolID) {
                         wrapped.position(wrapped.position() + 4);
                         remoteSequence = wrapped.getInt();
                         if (remoteSequence >= ack - 32) { //make sure packet is recent enough to matter
                             /*if (!inPackets.isEmpty()) {
-                                inPackets.take(); //remove oldest packet from recieved packet queue
-                            }
-                            inPackets.add(packet); //add newest packet to queue*/
+                             inPackets.take(); //remove oldest packet from recieved packet queue
+                             }
+                             inPackets.add(packet); //add newest packet to queue*/
 
                             if (remoteSequence > ack) {
                                 sequenceDifference = remoteSequence - ack;
-                                if (sequenceDifference > 32) {
-                                    getLocalAckSet().clear();
+                                if (sequenceDifference > 32) { //clear local acks if they are all too outdated
+                                    setLocalAckSet(new boolean[32]);
                                     ack = remoteSequence;
                                 } else {
-                                    tmpField.or(getLocalAckSet()); //copy localAckSet
-                                    getLocalAckSet().clear();
-                                    for (int i = sequenceDifference; i < 32 - sequenceDifference; i++) {
-                                        //i - sequenceDifference = the start of the bitset
-                                        getLocalAckSet().set(i - sequenceDifference, tmpField.get(i));
+                                    tmpSet = Arrays.copyOfRange(getLocalAckSet()); //copy localAckSet
+                                    setLocalAckSet(new boolean[32]);
+                                    for (int i = 0; i < 32 - sequenceDifference; i++) {
+                                        
                                     }
-                                    getLocalAckSet().set(32 - sequenceDifference, true); // push value for last local ack into bitset
+                                    /*for (int i = sequenceDifference; i < 32 - sequenceDifference; i++) {
+                                        //i - sequenceDifference = the start of the bitset
+                                        getLocalAckSet()[i - sequenceDifference] = tmpSet[i];
+                                        System.out.println((i - sequenceDifference) + " " + tmpSet[i]);
+                                    }*/
+                                    getLocalAckSet()[32 - sequenceDifference] = true; // push value for last local ack into bitset
                                     ack = remoteSequence; //update local ack if remote sequence is more recent
                                 }
                             } else {
-                                bitIndex = 32 - (ack - remoteSequence); //get index of bit to be set
-                                if (!getLocalAckSet().get(bitIndex)) {
-                                    getLocalAckSet().set(bitIndex, true);
+                                bitIndex = 31 - (ack - remoteSequence); //get index of bit to be set
+                                if (!getLocalAckSet()[bitIndex]) {
+                                    getLocalAckSet()[bitIndex] = true;
                                 }
                             }
                             wrapped.position(wrapped.position() + 4);
                             remoteAck = wrapped.getInt(); //get remote ack
-                            
+
                             wrapped.position(wrapped.position() + 4);
                             wrapped.get(remoteAckBytes); //get remote ack bitset
+                            
                             for (int i = 0; i < remoteAckBytes.length; i++) {
                                 for (int j = 0; j <= 7; j++) {
                                     int bitSetIndex = (i * 7) + i + j; //generates numbers 0-22 for setting bitset values
-                                    if (bitSetIndex == 23) {
+                                    if (bitSetIndex == 32) {
                                         break;
                                     }
-                                    getRemoteAckSet().set(bitSetIndex, isBitSet(remoteAckBytes[i], j));
+                                    getRemoteAckSet()[bitSetIndex] = isBitSet(remoteAckBytes[i], j);
                                 }
                             }
                         }
                         //String received = new String(inBytes, 0, inBytes.length);
                         System.out.println("Local Sequence: " + sequence);
                         System.out.println("Remote Sequence: " + ack);
+//                        for (int i = getLocalAckSet().length - 1; i >= 0; i--) {
+//                            System.out.println(i + " " + getLocalAckSet()[i]);
+//                        }
                         //Gdx.app.log("UDP Message", received);
                     }
                 }
@@ -340,19 +355,19 @@ public class Fighter extends ApplicationAdapter {
     }
 
     //wrappers to make sure threads deal with bitsets nicely
-    public synchronized BitSet getLocalAckSet() {
+    public synchronized boolean[] getLocalAckSet() {
         return localAckSet;
     }
 
-    public synchronized void setLocalAckSet(BitSet localAckSet) {
+    public synchronized void setLocalAckSet(boolean[] localAckSet) {
         this.localAckSet = localAckSet;
     }
 
-    public synchronized BitSet getRemoteAckSet() {
+    public synchronized boolean[] getRemoteAckSet() {
         return remoteAckSet;
     }
 
-    public synchronized void setRemoteAckSet(BitSet remoteAckSet) {
+    public synchronized void setRemoteAckSet(boolean[] remoteAckSet) {
         this.remoteAckSet = remoteAckSet;
     }
 

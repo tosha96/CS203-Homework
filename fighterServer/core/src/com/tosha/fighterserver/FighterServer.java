@@ -16,6 +16,25 @@ public class FighterServer {
     static final int protocolID = 68742731;
     Vector<Player> players = new Vector<Player>();
 
+    DatagramSocket socket;
+    byte[] buffer = new byte[256];
+    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+    InetAddress address;
+    ByteBuffer wrapped;
+    int sequence = 0;
+    int ack = 0;
+    boolean[] localAckSet = new boolean[32];
+    boolean[] remoteAckSet = new boolean[32];
+    ArrayBlockingQueue<DatagramPacket> inPackets = new ArrayBlockingQueue<DatagramPacket>(33);
+    ArrayBlockingQueue<DatagramPacket> outPackets = new ArrayBlockingQueue<DatagramPacket>(33);
+    int port;
+    int remoteAck;
+    byte[] remoteAckBytes = new byte[4];
+    int remoteSequence; // the server's remote sequence int that we recieve
+    int sequenceDifference; // the difference between the remote and local sequence
+    int bitIndex; // the index in the bitfield for the packet we are going to set
+    boolean[] tmpSet;
+
     public static void main(String[] arg) {
         FighterServer server = new FighterServer();
         server.go();
@@ -23,25 +42,8 @@ public class FighterServer {
 
     public void go() {
         try {
-            DatagramSocket socket = new DatagramSocket(4445);
-            byte[] buffer = new byte[256];
-            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-            InetAddress address;
-            ByteBuffer wrapped;
-            int sequence = 0;
-            int ack = 0;
-            BitSet localAckSet = new BitSet(32);
-            BitSet remoteAckSet = new BitSet(32);
-            ArrayBlockingQueue<DatagramPacket> inPackets = new ArrayBlockingQueue<DatagramPacket>(33);
-            ArrayBlockingQueue<DatagramPacket> outPackets = new ArrayBlockingQueue<DatagramPacket>(33);
-            int port;
-            int remoteAck;
-            byte[] remoteAckBytes = new byte[32];
-            int remoteSequence; // the server's remote sequence int that we recieve
-            int sequenceDifference; // the difference between the remote and local sequence
-            int bitIndex; // the index in the bitfield for the packet we are going to set
-            BitSet tmpField = new BitSet(32);
-
+            socket = new DatagramSocket(4445);
+                
             while (true) {
                 //
                 //Code to recieve packet and update ack info
@@ -49,33 +51,35 @@ public class FighterServer {
                 socket.receive(packet);
                 //buffer = packet.getData();
                 wrapped = ByteBuffer.wrap(packet.getData());
-                if (wrapped.getInt(0) == protocolID) {
+                wrapped.position(0);
+                if (wrapped.getInt() == protocolID) {
                     wrapped.position(wrapped.position() + 4);
                     remoteSequence = wrapped.getInt();
                     if (remoteSequence >= ack - 32) { //make sure packet is recent enough to matter
-                        /*if (!inPackets.isEmpty()) {
+                            /*if (!inPackets.isEmpty()) {
                          inPackets.take(); //remove oldest packet from recieved packet queue
                          }
-                         inPackets.add(packet);*/
+                         inPackets.add(packet); //add newest packet to queue*/
+
                         if (remoteSequence > ack) {
                             sequenceDifference = remoteSequence - ack;
                             if (sequenceDifference > 32) {
-                                localAckSet.clear();
+                                localAckSet = new boolean[32];
                                 ack = remoteSequence;
                             } else {
-                                tmpField.or(localAckSet); //copy localAckSet
-                                localAckSet.clear();
+                                tmpSet = localAckSet; //copy localAckSet
+                                localAckSet = new boolean[32];
                                 for (int i = sequenceDifference; i < 32 - sequenceDifference; i++) {
                                     //i - sequenceDifference = the start of the bitset
-                                    localAckSet.set(i - sequenceDifference, tmpField.get(i));
+                                    localAckSet[i - sequenceDifference] = tmpSet[i];
                                 }
-                                localAckSet.set(32 - sequenceDifference, true); // push value for last local ack into bitset
+                                localAckSet[32 - sequenceDifference] = true; // push value for last local ack into bitset
                                 ack = remoteSequence; //update local ack if remote sequence is more recent
                             }
                         } else {
-                            bitIndex = 32 - (ack - remoteSequence); //get index of bit to be set
-                            if (!localAckSet.get(bitIndex)) {
-                                localAckSet.set(bitIndex, true);
+                            bitIndex = 31 - (ack - remoteSequence); //get index of bit to be set
+                            if (!localAckSet[bitIndex]) {
+                                localAckSet[bitIndex] = true;
                             }
                         }
                         wrapped.position(wrapped.position() + 4);
@@ -83,15 +87,22 @@ public class FighterServer {
 
                         wrapped.position(wrapped.position() + 4);
                         wrapped.get(remoteAckBytes); //get remote ack bitset
+                        
                         for (int i = 0; i < remoteAckBytes.length; i++) {
                             for (int j = 0; j <= 7; j++) {
-                                int bitSetIndex = (i * 7) + i + j; //generates numbers 0-22 for setting bitset values
-                                if (bitSetIndex == 23) {
+                                int bitSetIndex = (i * 7) + i + j; //generates numbers 0-32 for setting bitset values
+                                if (bitSetIndex == 32) {
                                     break;
                                 }
-                                remoteAckSet.set(bitSetIndex, isBitSet(remoteAckBytes[i], j));
+                                remoteAckSet[bitSetIndex] = isBitSet(remoteAckBytes[i], j);
                             }
                         }
+                    }
+                    //String received = new String(inBytes, 0, inBytes.length);
+                    System.out.println("Local Sequence: " + sequence);
+                    System.out.println("Remote Sequence: " + ack);
+                    for (int i = localAckSet.length - 1; i >= 0; i--) {
+                        System.out.println(i + " " + localAckSet[i]);
                     }
                     //
                     //Code to send packet
@@ -106,7 +117,11 @@ public class FighterServer {
                     wrapped.position(wrapped.position() + 4);
                     wrapped.putInt(ack);
                     wrapped.position(wrapped.position() + 4);
-                    wrapped.put(localAckSet.toByteArray());
+                    BitSet tempBitSet = new BitSet();
+                    for (int i = 0; i < localAckSet.length; i++) {
+                        tempBitSet.set(i, localAckSet[i]); //convert from boolean[] to bitset
+                    }
+                    wrapped.put(tempBitSet.toByteArray()); //its okay to write the whole bitset because the bitset > 32 is just zeroes
                     wrapped.position(wrapped.position() + 4);
 
                     byte[] echo = "echo".getBytes();
@@ -117,13 +132,11 @@ public class FighterServer {
                     packet = new DatagramPacket(buffer, buffer.length, address, port);
                     //outPackets.add(packet); //need to fix like inpackets
                     socket.send(packet);
-
-                    System.out.println("Local Sequence: " + sequence);
-                    System.out.println("Remote Sequence: " + ack);
                     sequence += 1;
                 }
             }
         } catch (Exception ex) {
+            ex.printStackTrace();
         }
     }
 
