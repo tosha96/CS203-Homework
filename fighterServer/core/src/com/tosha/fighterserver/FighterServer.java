@@ -9,6 +9,7 @@ import java.net.*;
 import java.nio.*;
 import java.util.BitSet;
 import java.util.Vector;
+import java.util.concurrent.ArrayBlockingQueue;
 
 public class FighterServer {
 
@@ -27,28 +28,106 @@ public class FighterServer {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             InetAddress address;
             ByteBuffer wrapped;
-            int sequence;
-            int ack;
-            BitSet ackField = new BitSet(32);
+            int sequence = 0;
+            int ack = 0;
+            BitSet localAckSet = new BitSet(32);
+            BitSet remoteAckSet = new BitSet(32);
+            ArrayBlockingQueue<DatagramPacket> inPackets = new ArrayBlockingQueue<DatagramPacket>(33);
+            ArrayBlockingQueue<DatagramPacket> outPackets = new ArrayBlockingQueue<DatagramPacket>(33);
             int port;
+            int remoteAck;
+            byte[] remoteAckBytes = new byte[32];
+            int remoteSequence; // the server's remote sequence int that we recieve
+            int sequenceDifference; // the difference between the remote and local sequence
+            int bitIndex; // the index in the bitfield for the packet we are going to set
+            BitSet tmpField = new BitSet(32);
 
             while (true) {
+                //
+                //Code to recieve packet and update ack info
+                //
                 socket.receive(packet);
-                buffer = packet.getData();
-                wrapped = ByteBuffer.wrap(buffer);
+                //buffer = packet.getData();
+                wrapped = ByteBuffer.wrap(packet.getData());
                 if (wrapped.getInt(0) == protocolID) {
+                    wrapped.position(wrapped.position() + 4);
+                    remoteSequence = wrapped.getInt();
+                    if (remoteSequence >= ack - 32) { //make sure packet is recent enough to matter
+                        /*if (!inPackets.isEmpty()) {
+                         inPackets.take(); //remove oldest packet from recieved packet queue
+                         }
+                         inPackets.add(packet);*/
+                        if (remoteSequence > ack) {
+                            sequenceDifference = remoteSequence - ack;
+                            if (sequenceDifference > 32) {
+                                localAckSet.clear();
+                                ack = remoteSequence;
+                            } else {
+                                tmpField.or(localAckSet); //copy localAckSet
+                                localAckSet.clear();
+                                for (int i = sequenceDifference; i < 32 - sequenceDifference; i++) {
+                                    //i - sequenceDifference = the start of the bitset
+                                    localAckSet.set(i - sequenceDifference, tmpField.get(i));
+                                }
+                                localAckSet.set(32 - sequenceDifference, true); // push value for last local ack into bitset
+                                ack = remoteSequence; //update local ack if remote sequence is more recent
+                            }
+                        } else {
+                            bitIndex = 32 - (ack - remoteSequence); //get index of bit to be set
+                            if (!localAckSet.get(bitIndex)) {
+                                localAckSet.set(bitIndex, true);
+                            }
+                        }
+                        wrapped.position(wrapped.position() + 4);
+                        remoteAck = wrapped.getInt(); //get remote ack
 
-                    System.out.println(new String(buffer, 0, buffer.length));
+                        wrapped.position(wrapped.position() + 4);
+                        wrapped.get(remoteAckBytes); //get remote ack bitset
+                        for (int i = 0; i < remoteAckBytes.length; i++) {
+                            for (int j = 0; j <= 7; j++) {
+                                int bitSetIndex = (i * 7) + i + j; //generates numbers 0-22 for setting bitset values
+                                if (bitSetIndex == 23) {
+                                    break;
+                                }
+                                remoteAckSet.set(bitSetIndex, isBitSet(remoteAckBytes[i], j));
+                            }
+                        }
+                    }
+                    //
+                    //Code to send packet
+                    //
+
+                    buffer = new byte[256];
+                    wrapped = ByteBuffer.wrap(buffer);
+
+                    wrapped.putInt(protocolID);
+                    wrapped.position(wrapped.position() + 4);
+                    wrapped.putInt(sequence);
+                    wrapped.position(wrapped.position() + 4);
+                    wrapped.putInt(ack);
+                    wrapped.position(wrapped.position() + 4);
+                    wrapped.put(localAckSet.toByteArray());
+                    wrapped.position(wrapped.position() + 4);
+
+                    byte[] echo = "echo".getBytes();
+                    wrapped.put(echo);
+
                     address = packet.getAddress();
                     port = packet.getPort();
                     packet = new DatagramPacket(buffer, buffer.length, address, port);
+                    //outPackets.add(packet); //need to fix like inpackets
                     socket.send(packet);
+
+                    System.out.println("Local Sequence: " + sequence);
+                    System.out.println("Remote Sequence: " + ack);
+                    sequence += 1;
                 }
             }
         } catch (Exception ex) {
         }
     }
 
+    //currently unused multithreading code
     public class ClientHandler implements Runnable {
 
         Player player;
@@ -85,6 +164,10 @@ public class FighterServer {
             }
         }
 
+    }
+
+    private static Boolean isBitSet(byte b, int bit) {
+        return (b & (1 << bit)) != 0;
     }
 
 }

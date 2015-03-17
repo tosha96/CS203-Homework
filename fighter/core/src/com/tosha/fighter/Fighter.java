@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.net.*;
 import java.nio.ByteBuffer;
+import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
 
 public class Fighter extends ApplicationAdapter {
 
@@ -49,8 +51,11 @@ public class Fighter extends ApplicationAdapter {
     ByteBuffer wrapped;
     int sequence;
     int ack;
-    BitSet ackField = new BitSet(32);
-    
+    BitSet localAckSet = new BitSet(32);
+    BitSet remoteAckSet = new BitSet(32);
+    ArrayBlockingQueue<DatagramPacket> inPackets = new ArrayBlockingQueue<DatagramPacket>(33);
+    ArrayBlockingQueue<DatagramPacket> outPackets = new ArrayBlockingQueue<DatagramPacket>(33);
+
     static final int protocolID = 68742731;
 
     @Override
@@ -148,25 +153,24 @@ public class Fighter extends ApplicationAdapter {
 
         if (Gdx.input.isKeyPressed(Keys.O)) {
             try {
-                sequence += 1;
                 wrapped = ByteBuffer.wrap(buffer);
-                
+
                 wrapped.putInt(protocolID);
                 wrapped.position(wrapped.position() + 4);
                 wrapped.putInt(sequence);
                 wrapped.position(wrapped.position() + 4);
                 wrapped.putInt(ack);
                 wrapped.position(wrapped.position() + 4);
-                wrapped.put(ackField.toByteArray());
-                
+                wrapped.put(getLocalAckSet().toByteArray());
+                wrapped.position(wrapped.position() + 4);
+
                 byte[] echo = "echo".getBytes();
                 wrapped.put(echo);
-                
-                //buffer = "echo".getBytes();
-                //String received = new String(buffer, 0, buffer.length);
-                //Gdx.app.log("UDP Message", received);
+
                 packet = new DatagramPacket(buffer, buffer.length, address, 4445);
+                //outPackets.add(packet); //need to fix like inpackets
                 socket.send(packet);
+                sequence += 1;
             } catch (Exception ex) {
                 ex.printStackTrace();
             }
@@ -254,10 +258,18 @@ public class Fighter extends ApplicationAdapter {
     };
 
     public class IncomingReader implements Runnable {
+
+        //packet, wrapped, buffer, etc. are all different from ones initialized at the top of the class
+        //these are used for reciving, those are used for sending
         DatagramPacket packet;
         ByteBuffer wrapped;
-        byte[] inBytes = new byte[30];
-        
+        byte[] remoteAckBytes = new byte[32];
+        int remoteSequence; // the server's remote sequence int that we recieve
+        int sequenceDifference; // the difference between the remote and local sequence
+        int bitIndex; // the index in the bitfield for the packet we are going to set
+        int remoteAck;
+        BitSet tmpField = new BitSet(32);
+
         @Override
         public void run() {
             try {
@@ -266,10 +278,54 @@ public class Fighter extends ApplicationAdapter {
                     socket.receive(packet);
                     wrapped = ByteBuffer.wrap(packet.getData());
                     if (wrapped.getInt(0) == protocolID) {
-                        wrapped.position(4);
-                        wrapped.get(inBytes);
-                        String received = new String(inBytes, 0, inBytes.length);
-                        Gdx.app.log("UDP Message", received);
+                        wrapped.position(wrapped.position() + 4);
+                        remoteSequence = wrapped.getInt();
+                        if (remoteSequence >= ack - 32) { //make sure packet is recent enough to matter
+                            /*if (!inPackets.isEmpty()) {
+                                inPackets.take(); //remove oldest packet from recieved packet queue
+                            }
+                            inPackets.add(packet); //add newest packet to queue*/
+
+                            if (remoteSequence > ack) {
+                                sequenceDifference = remoteSequence - ack;
+                                if (sequenceDifference > 32) {
+                                    getLocalAckSet().clear();
+                                    ack = remoteSequence;
+                                } else {
+                                    tmpField.or(getLocalAckSet()); //copy localAckSet
+                                    getLocalAckSet().clear();
+                                    for (int i = sequenceDifference; i < 32 - sequenceDifference; i++) {
+                                        //i - sequenceDifference = the start of the bitset
+                                        getLocalAckSet().set(i - sequenceDifference, tmpField.get(i));
+                                    }
+                                    getLocalAckSet().set(32 - sequenceDifference, true); // push value for last local ack into bitset
+                                    ack = remoteSequence; //update local ack if remote sequence is more recent
+                                }
+                            } else {
+                                bitIndex = 32 - (ack - remoteSequence); //get index of bit to be set
+                                if (!getLocalAckSet().get(bitIndex)) {
+                                    getLocalAckSet().set(bitIndex, true);
+                                }
+                            }
+                            wrapped.position(wrapped.position() + 4);
+                            remoteAck = wrapped.getInt(); //get remote ack
+                            
+                            wrapped.position(wrapped.position() + 4);
+                            wrapped.get(remoteAckBytes); //get remote ack bitset
+                            for (int i = 0; i < remoteAckBytes.length; i++) {
+                                for (int j = 0; j <= 7; j++) {
+                                    int bitSetIndex = (i * 7) + i + j; //generates numbers 0-22 for setting bitset values
+                                    if (bitSetIndex == 23) {
+                                        break;
+                                    }
+                                    getRemoteAckSet().set(bitSetIndex, isBitSet(remoteAckBytes[i], j));
+                                }
+                            }
+                        }
+                        //String received = new String(inBytes, 0, inBytes.length);
+                        System.out.println("Local Sequence: " + sequence);
+                        System.out.println("Remote Sequence: " + ack);
+                        //Gdx.app.log("UDP Message", received);
                     }
                 }
             } catch (Exception ex) {
@@ -278,6 +334,28 @@ public class Fighter extends ApplicationAdapter {
         }
 
     }
+
+    private static Boolean isBitSet(byte b, int bit) {
+        return (b & (1 << bit)) != 0;
+    }
+
+    //wrappers to make sure threads deal with bitsets nicely
+    public synchronized BitSet getLocalAckSet() {
+        return localAckSet;
+    }
+
+    public synchronized void setLocalAckSet(BitSet localAckSet) {
+        this.localAckSet = localAckSet;
+    }
+
+    public synchronized BitSet getRemoteAckSet() {
+        return remoteAckSet;
+    }
+
+    public synchronized void setRemoteAckSet(BitSet remoteAckSet) {
+        this.remoteAckSet = remoteAckSet;
+    }
+
 }
 
 //https://github.com/libgdx/libgdx/wiki/Box2d
