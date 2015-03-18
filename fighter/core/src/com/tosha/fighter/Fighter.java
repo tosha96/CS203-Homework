@@ -204,9 +204,8 @@ public class Fighter extends ApplicationAdapter {
                     outPackets.take(); //remove oldest packet from recieved packet queue
                 }
                 outPackets.add(new PacketContainer(packet, Instant.now().getEpochSecond())); //need to fix like inpackets
-                
+
                 socket.send(packet);
-                System.out.println("packet sent");
                 sequence += 1;
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -324,9 +323,7 @@ public class Fighter extends ApplicationAdapter {
                     if (wrapped.getInt() == protocolID) {
                         wrapped.position(wrapped.position() + 4);
                         remoteSequence = wrapped.getInt();
-                        System.out.println(remoteSequence + " " + (ack - 32));
                         if (remoteSequence >= ack - 32) { //make sure packet is recent enough to matter
-                            System.out.println("packet is recent");
                             if (!inPackets.isEmpty()) {
                                 inPackets.take(); //remove oldest packet from recieved packet queue
                             }
@@ -381,19 +378,23 @@ public class Fighter extends ApplicationAdapter {
                         }
                         //Gdx.app.log("UDP Message", received);
                     }
-                    
+
                     //resend lost packets
+                    long now = Instant.now().getEpochSecond();
                     for (PacketContainer pc : outPackets) {
                         wrapped = ByteBuffer.wrap(pc.getPacket().getData());
                         wrapped.position(4);
                         int sequenceNumber = wrapped.getInt();
-                        long now = Instant.now().getEpochSecond();
                         if (sequenceNumber != ack) {
                             //check to see if packed is acked in ackset
                             //resend if it isn't
-                            if (!getRemoteAckSet()[31 - (ack - sequenceNumber)] && now - pc.getTimestamp() >= 1) {
-                                socket.send(pc.getPacket());
-                                System.out.println("resending packet");
+                            int ackIndex = ack - sequenceNumber;
+
+                            if (ackIndex >= 0 && ackIndex < 32) {
+                                if (!getRemoteAckSet()[31 - (ack - sequenceNumber)] && now - pc.getTimestamp() >= 1) {
+                                    socket.send(pc.getPacket());
+                                    System.out.println("resending packet");
+                                }
                             }
                         } else {
                             if (now - pc.getTimestamp() >= 1) {
