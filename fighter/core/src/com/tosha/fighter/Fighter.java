@@ -12,10 +12,13 @@ import com.badlogic.gdx.math.*;
 import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
 import com.badlogic.gdx.utils.Array;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.net.*;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Queue;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -46,6 +49,7 @@ public class Fighter extends ApplicationAdapter {
     Array<Body> bodies = new Array<Body>();
 
     DatagramSocket socket;
+    Socket tcpSocket;
     InetAddress address;
     byte[] buffer = new byte[256];
     DatagramPacket packet;
@@ -54,19 +58,42 @@ public class Fighter extends ApplicationAdapter {
     int ack;
     boolean[] localAckSet = new boolean[32];
     boolean[] remoteAckSet = new boolean[32];
-    ArrayBlockingQueue<DatagramPacket> inPackets = new ArrayBlockingQueue<DatagramPacket>(33);
-    ArrayBlockingQueue<DatagramPacket> outPackets = new ArrayBlockingQueue<DatagramPacket>(33);
+    ArrayBlockingQueue<PacketContainer> inPackets = new ArrayBlockingQueue<PacketContainer>(33);
+    ArrayBlockingQueue<PacketContainer> outPackets = new ArrayBlockingQueue<PacketContainer>(33);
+    DataInputStream reader;
+    DataOutputStream writer;
+    int udpPort;
 
     static final int protocolID = 68742731;
 
     @Override
     public void create() {
         try {
-            socket = new DatagramSocket();
+            tcpSocket = new Socket("127.0.0.1", 5001);
+            reader = new DataInputStream(tcpSocket.getInputStream());
+            writer = new DataOutputStream(tcpSocket.getOutputStream());
             address = InetAddress.getByName("127.0.0.1");
-            Thread readerThread = new Thread(new IncomingReader());
-            readerThread.start();
+            byte[] inBuffer = new byte[32];
+            ByteBuffer inWrapped = ByteBuffer.wrap(inBuffer);
+            /*while (reader.read(inBuffer) <= 8) {
+             //reader.readFully(inBuffer); //read response w/ UDP port from server
+             //just read once
+             }*/
+            reader.read(inBuffer);
+            inWrapped.position(0);
+            int connectionSuccess = inWrapped.getInt();
+            System.out.println("Connected to server, result: " + connectionSuccess);
+            if (connectionSuccess == 1) {
+                System.out.println("started reader setup");
+                inWrapped.position(inWrapped.position() + 4);
+                udpPort = inWrapped.getInt();
+                System.out.println(udpPort);
+                Thread readerThread = new Thread(new IncomingReader());
+                readerThread.start();
+                System.out.println("reader started");
+            }
         } catch (Exception ex) {
+            ex.printStackTrace();
         }
 
         playerSheet = new Texture(Gdx.files.internal("fighterspritesheet.png"));
@@ -172,9 +199,14 @@ public class Fighter extends ApplicationAdapter {
                 byte[] echo = "echo".getBytes();
                 wrapped.put(echo);
 
-                packet = new DatagramPacket(buffer, buffer.length, address, 4445);
-                //outPackets.add(packet); //need to fix like inpackets
+                packet = new DatagramPacket(buffer, buffer.length, address, udpPort);
+                if (!outPackets.isEmpty()) {
+                    outPackets.take(); //remove oldest packet from recieved packet queue
+                }
+                outPackets.add(new PacketContainer(packet, Instant.now().getEpochSecond())); //need to fix like inpackets
+                
                 socket.send(packet);
+                System.out.println("packet sent");
                 sequence += 1;
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -273,11 +305,16 @@ public class Fighter extends ApplicationAdapter {
         int sequenceDifference; // the difference between the remote and local sequence
         int bitIndex; // the index in the bitfield for the packet we are going to set
         int remoteAck;
+        //int port;
         boolean[] tmpSet = new boolean[32];
 
+        /*public IncomingReader(int port) {
+         this.port = port;
+         }*/
         @Override
         public void run() {
             try {
+                socket = new DatagramSocket();
                 while (true) {
                     packet = new DatagramPacket(buffer, buffer.length);
                     socket.receive(packet);
@@ -287,11 +324,13 @@ public class Fighter extends ApplicationAdapter {
                     if (wrapped.getInt() == protocolID) {
                         wrapped.position(wrapped.position() + 4);
                         remoteSequence = wrapped.getInt();
+                        System.out.println(remoteSequence + " " + (ack - 32));
                         if (remoteSequence >= ack - 32) { //make sure packet is recent enough to matter
-                            /*if (!inPackets.isEmpty()) {
-                             inPackets.take(); //remove oldest packet from recieved packet queue
-                             }
-                             inPackets.add(packet); //add newest packet to queue*/
+                            System.out.println("packet is recent");
+                            if (!inPackets.isEmpty()) {
+                                inPackets.take(); //remove oldest packet from recieved packet queue
+                            }
+                            inPackets.add(new PacketContainer(packet, Instant.now().getEpochSecond())); //add newest packet to queue
 
                             if (remoteSequence > ack) {
                                 sequenceDifference = remoteSequence - ack;
@@ -299,17 +338,17 @@ public class Fighter extends ApplicationAdapter {
                                     setLocalAckSet(new boolean[32]);
                                     ack = remoteSequence;
                                 } else {
-                                    tmpSet = Arrays.copyOfRange(getLocalAckSet()); //copy localAckSet
+                                    tmpSet = Arrays.copyOfRange(getLocalAckSet(), sequenceDifference, 31); //copy localAckSet
                                     setLocalAckSet(new boolean[32]);
-                                    for (int i = 0; i < 32 - sequenceDifference; i++) {
-                                        
+                                    for (int i = 0; i < tmpSet.length; i++) {
+                                        getLocalAckSet()[i] = tmpSet[i];
                                     }
                                     /*for (int i = sequenceDifference; i < 32 - sequenceDifference; i++) {
-                                        //i - sequenceDifference = the start of the bitset
-                                        getLocalAckSet()[i - sequenceDifference] = tmpSet[i];
-                                        System.out.println((i - sequenceDifference) + " " + tmpSet[i]);
-                                    }*/
-                                    getLocalAckSet()[32 - sequenceDifference] = true; // push value for last local ack into bitset
+                                     //i - sequenceDifference = the start of the bitset
+                                     getLocalAckSet()[i - sequenceDifference] = tmpSet[i];
+                                     System.out.println((i - sequenceDifference) + " " + tmpSet[i]);
+                                     }*/
+                                    getLocalAckSet()[31 - sequenceDifference] = true; // push value for last local ack into bitset
                                     ack = remoteSequence; //update local ack if remote sequence is more recent
                                 }
                             } else {
@@ -323,7 +362,7 @@ public class Fighter extends ApplicationAdapter {
 
                             wrapped.position(wrapped.position() + 4);
                             wrapped.get(remoteAckBytes); //get remote ack bitset
-                            
+
                             for (int i = 0; i < remoteAckBytes.length; i++) {
                                 for (int j = 0; j <= 7; j++) {
                                     int bitSetIndex = (i * 7) + i + j; //generates numbers 0-22 for setting bitset values
@@ -337,10 +376,31 @@ public class Fighter extends ApplicationAdapter {
                         //String received = new String(inBytes, 0, inBytes.length);
                         System.out.println("Local Sequence: " + sequence);
                         System.out.println("Remote Sequence: " + ack);
-//                        for (int i = getLocalAckSet().length - 1; i >= 0; i--) {
-//                            System.out.println(i + " " + getLocalAckSet()[i]);
-//                        }
+                        for (int i = getRemoteAckSet().length - 1; i >= 0; i--) {
+                            System.out.println(i + " " + getRemoteAckSet()[i]);
+                        }
                         //Gdx.app.log("UDP Message", received);
+                    }
+                    
+                    //resend lost packets
+                    for (PacketContainer pc : outPackets) {
+                        wrapped = ByteBuffer.wrap(pc.getPacket().getData());
+                        wrapped.position(4);
+                        int sequenceNumber = wrapped.getInt();
+                        long now = Instant.now().getEpochSecond();
+                        if (sequenceNumber != ack) {
+                            //check to see if packed is acked in ackset
+                            //resend if it isn't
+                            if (!getRemoteAckSet()[31 - (ack - sequenceNumber)] && now - pc.getTimestamp() >= 1) {
+                                socket.send(pc.getPacket());
+                                System.out.println("resending packet");
+                            }
+                        } else {
+                            if (now - pc.getTimestamp() >= 1) {
+                                socket.send(pc.getPacket());
+                                System.out.println("resending packet");
+                            }
+                        }
                     }
                 }
             } catch (Exception ex) {

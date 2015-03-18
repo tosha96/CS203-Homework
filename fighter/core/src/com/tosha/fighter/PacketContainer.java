@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.tosha.fighterserver;
+package com.tosha.fighter;
 
 import java.net.DatagramPacket;
 
