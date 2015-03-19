@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.tosha.fighter;
+package com.tosha.fighterserver;
 
 import com.badlogic.gdx.physics.box2d.*;
 
@@ -11,7 +11,7 @@ import com.badlogic.gdx.physics.box2d.*;
  *
  * @author Aantokhin
  */
-public class Player {
+public class PlayerEntity {
     private float maxVelocityX  = 1000.0f;
     private float maxVelocityY  = 2000.0f;
     
@@ -27,12 +27,14 @@ public class Player {
     private World world;
     
     private boolean headingLeft = true;
+    
+    Player player;
 
-    public Player(World world) {
+    public PlayerEntity(World world, String name, float x, float y) {
         this.world = world; //reference to game world
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyDef.BodyType.DynamicBody;
-        bodyDef.position.set(100, 100);
+        bodyDef.position.set(x, y);
         body = world.createBody(bodyDef);
 
         PolygonShape shape = new PolygonShape();
@@ -49,7 +51,7 @@ public class Player {
         
         body.setFixedRotation(true);
         body.setLinearDamping(-0.2f);
-        body.setUserData(new BodyData("player", 100, 100));
+        body.setUserData(new BodyData(name, x, y));
         
     }
 

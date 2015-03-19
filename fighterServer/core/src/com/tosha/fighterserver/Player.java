@@ -39,6 +39,8 @@ public class Player {
     ByteBuffer wrapped;
     byte[] buffer;
     DatagramPacket packet;
+    InputState state;
+
 
     public Player(Socket clientSocket, DataInputStream inStream, DataOutputStream outStream) {
         try {
@@ -48,6 +50,7 @@ public class Player {
             this.address = clientSocket.getInetAddress();
             this.port = (int) (Math.random() * 500) + 5100; //assign new random port for UDP communications
             this.udpSocket = new DatagramSocket(this.port);
+            state = new InputState();
         } catch (Exception ex) {
         }
     }
@@ -100,37 +103,46 @@ public class Player {
         this.port = port;
     }
 
-    public synchronized void updateState(int x1, int y1, int x2, int y2) {
+    public synchronized void updateState(float x1, float y1, float xv1, float yv1, float x2, float y2, float xv2, float yv2) {
         try {
             buffer = new byte[256];
             wrapped = ByteBuffer.wrap(buffer);
-            packet = new DatagramPacket(buffer, buffer.length);
+            //packet = new DatagramPacket(buffer, buffer.length);
 
+            wrapped.position(0);
             wrapped.putInt(protocolID);
-            wrapped.position(wrapped.position() + 4);
+            wrapped.position(4);
             wrapped.putInt(this.sequence);
-            wrapped.position(wrapped.position() + 4);
+            wrapped.position(8);
             wrapped.putInt(this.ack);
-            wrapped.position(wrapped.position() + 4);
+            wrapped.position(12);
             BitSet tempBitSet = new BitSet();
             for (int i = 0; i < this.localAckSet.length; i++) {
                 tempBitSet.set(i, this.localAckSet[i]); //convert from boolean[] to bitset
             }
             wrapped.put(tempBitSet.toByteArray()); //its okay to write the whole bitset because the bitset > 32 is just zeroes
-            wrapped.position(wrapped.position() + 4);
+            wrapped.position(16);
             
             wrapped.putInt(0); //id for game state update
-            wrapped.position(wrapped.position() + 4);
+            wrapped.position(20);
             
-            wrapped.putInt(x1);
-            wrapped.position(wrapped.position() + 4);
-            wrapped.putInt(y1);
-            wrapped.position(wrapped.position() + 4);
+            wrapped.putFloat(x1);
+            wrapped.position(24);
+            wrapped.putFloat(y1);
+            wrapped.position(28);
+            wrapped.putFloat(xv1);
+            wrapped.position(32);
+            wrapped.putFloat(yv1);
+            wrapped.position(36);
             
-            wrapped.putInt(x2);
-            wrapped.position(wrapped.position() + 4);
-            wrapped.putInt(y2);
-            wrapped.position(wrapped.position() + 4);
+            wrapped.putFloat(x2);
+            wrapped.position(40);
+            wrapped.putFloat(y2);
+            wrapped.position(44);
+            wrapped.putFloat(xv2);
+            wrapped.position(48);
+            wrapped.putFloat(yv2);
+            wrapped.position(52);
 
             //byte[] echo = "echo".getBytes();
             //wrapped.put(echo);
@@ -144,6 +156,7 @@ public class Player {
 
             udpSocket.send(packet);
             this.sequence += 1;
+            //System.out.println(address.toString() + " " + port);
         } catch (Exception ex) {
             ex.printStackTrace();
         }

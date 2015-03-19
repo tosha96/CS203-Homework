@@ -30,7 +30,8 @@ public class Fighter extends ApplicationAdapter {
     World world;
     OrthographicCamera camera;
     Body groundBody;
-    Player player;
+    PlayerEntity player1;
+    PlayerEntity player2;
 
     private static final int FRAME_COLS = 5;
     private static final int FRAME_ROWS = 5;
@@ -65,9 +66,36 @@ public class Fighter extends ApplicationAdapter {
     int udpPort;
 
     static final int protocolID = 68742731;
+    InputState state = new InputState();
+    PlayerEntity currentPlayer;
 
     @Override
     public void create() {
+        Box2D.init();
+        world = new World(new Vector2(0, -20), true);
+        world.setContactListener(new ListenerClass());
+        debugRenderer = new Box2DDebugRenderer();
+        camera = new OrthographicCamera();
+        camera.setToOrtho(false, 800, 480);
+
+        player1 = new PlayerEntity(world, "player1", 100.0f, 100.0f);
+        player2 = new PlayerEntity(world, "player2", 400.0f, 100.0f);
+
+        BodyDef groundBodyDef = new BodyDef();
+        groundBodyDef.position.set(new Vector2(0, 10));
+
+        groundBody = world.createBody(groundBodyDef);
+
+        PolygonShape groundBox = new PolygonShape();
+        groundBox.setAsBox(camera.viewportWidth, 10.0f);
+        FixtureDef fixtureDef = new FixtureDef();
+        fixtureDef.shape = groundBox;
+        fixtureDef.density = 0.0f;
+        //fixtureDef.isSensor = true;
+        groundBody.createFixture(fixtureDef);
+        groundBody.setUserData(new BodyData("ground", groundBody.getPosition().x, groundBody.getPosition().y));
+        groundBox.dispose();
+
         try {
             tcpSocket = new Socket("127.0.0.1", 5001);
             reader = new DataInputStream(tcpSocket.getInputStream());
@@ -83,15 +111,21 @@ public class Fighter extends ApplicationAdapter {
             inWrapped.position(0);
             int connectionSuccess = inWrapped.getInt();
             System.out.println("Connected to server, result: " + connectionSuccess);
-            if (connectionSuccess == 1) {
-                System.out.println("started reader setup");
-                inWrapped.position(inWrapped.position() + 4);
-                udpPort = inWrapped.getInt();
-                System.out.println(udpPort);
-                Thread readerThread = new Thread(new IncomingReader());
-                readerThread.start();
-                System.out.println("reader started");
+            System.out.println("started reader setup");
+            inWrapped.position(4);
+            udpPort = inWrapped.getInt();
+            System.out.println(udpPort);
+            socket = new DatagramSocket();
+            Thread readerThread = new Thread(new IncomingReader());
+            readerThread.start();
+            if (connectionSuccess == 0) {
+                currentPlayer = player1;
+                System.out.println("I am player 1");
+            } else if (connectionSuccess == 1) {
+                currentPlayer = player2;
+                System.out.println("I am player 2");
             }
+            System.out.println("reader started");
         } catch (Exception ex) {
             ex.printStackTrace();
         }
@@ -117,101 +151,144 @@ public class Fighter extends ApplicationAdapter {
         spriteBatch = new SpriteBatch();
         stateTime = 0f;
 
-        Box2D.init();
-        world = new World(new Vector2(0, -20), true);
-        world.setContactListener(new ListenerClass());
-        debugRenderer = new Box2DDebugRenderer();
-        camera = new OrthographicCamera();
-        camera.setToOrtho(false, 800, 480);
-
-        player = new Player(world);
-
-        BodyDef groundBodyDef = new BodyDef();
-        groundBodyDef.position.set(new Vector2(0, 10));
-
-        groundBody = world.createBody(groundBodyDef);
-
-        PolygonShape groundBox = new PolygonShape();
-        groundBox.setAsBox(camera.viewportWidth, 10.0f);
-        FixtureDef fixtureDef = new FixtureDef();
-        fixtureDef.shape = groundBox;
-        fixtureDef.density = 0.0f;
-        //fixtureDef.isSensor = true;
-        groundBody.createFixture(fixtureDef);
-        groundBody.setUserData(new BodyData("ground", groundBody.getPosition().x, groundBody.getPosition().y));
-        groundBox.dispose();
-
     }
 
     @Override
     public void render() {
         stateTime += Gdx.graphics.getDeltaTime();
 
-        Vector2 vel = player.getBody().getLinearVelocity();
-        Vector2 pos = player.getBody().getPosition();
+        Vector2 vel = currentPlayer.getBody().getLinearVelocity();
+        Vector2 pos = currentPlayer.getBody().getPosition();
+
+        this.state.setW(false);
+        this.state.setA(false);
+        this.state.setS(false);
+        this.state.setD(false);
 
         //WASD to move
-        if (Gdx.input.isKeyPressed(Keys.A) && vel.x > -player.getMaxVelocityX()) {
-            this.player.getBody().applyLinearImpulse(-player.getSpeedX(), 0, pos.x, pos.y, true);
-            player.setHeadingLeft(true);
+        if (Gdx.input.isKeyPressed(Keys.A) && vel.x > -currentPlayer.getMaxVelocityX()) {
+            //this.currentPlayer.getBody().applyLinearImpulse(-currentPlayer.getSpeedX(), 0, pos.x, pos.y, true);
+            currentPlayer.setHeadingLeft(true);
+            this.state.setA(true);
             //currentFrame.flip(true, false);
         }
 
-        if (Gdx.input.isKeyPressed(Keys.D) && vel.x < player.getMaxVelocityX()) {
-            this.player.getBody().applyLinearImpulse(player.getSpeedX(), 0, pos.x, pos.y, true);
-            player.setHeadingLeft(false);
+        if (Gdx.input.isKeyPressed(Keys.D) && vel.x < currentPlayer.getMaxVelocityX()) {
+            //this.currentPlayer.getBody().applyLinearImpulse(currentPlayer.getSpeedX(), 0, pos.x, pos.y, true);
+            currentPlayer.setHeadingLeft(false);
+            this.state.setD(true);
             //currentFrame.flip(false, false);
         }
 
         if (!Gdx.input.isKeyPressed(Keys.A) && !Gdx.input.isKeyPressed(Keys.D)) {
             if (vel.x > 0) {
-                this.player.getBody().applyLinearImpulse(-player.getBreakSpeedY(), 0, pos.x, pos.y, true);
+                // this.currentPlayer.getBody().applyLinearImpulse(-currentPlayer.getBreakSpeedY(), 0, pos.x, pos.y, true);
             } else if (vel.x < 0) {
-                this.player.getBody().applyLinearImpulse(player.getBreakSpeedY(), 0, pos.x, pos.y, true);
+                // this.currentPlayer.getBody().applyLinearImpulse(currentPlayer.getBreakSpeedY(), 0, pos.x, pos.y, true);
             }
         }
 
-        if (Gdx.input.isKeyPressed(Keys.S) && vel.y > -player.getMaxVelocityY()) {
-            this.player.getBody().applyLinearImpulse(0, -player.getSpeedY(), pos.x, pos.y, true);
+        if (Gdx.input.isKeyPressed(Keys.S) && vel.y > -player1.getMaxVelocityY()) {
+            //this.currentPlayer.getBody().applyLinearImpulse(0, -currentPlayer.getSpeedY(), pos.x, pos.y, true);
+            this.state.setS(true);
         }
 
-        if (Gdx.input.isKeyPressed(Keys.W) && vel.y < player.getMaxVelocityY()) {
-            this.player.getBody().applyLinearImpulse(0, player.getSpeedY(), pos.x, pos.y, true);
+        if (Gdx.input.isKeyPressed(Keys.W) && vel.y < player1.getMaxVelocityY()) {
+            //this.currentPlayer.getBody().applyLinearImpulse(0, currentPlayer.getSpeedY(), pos.x, pos.y, true);
+            this.state.setW(true);
         }
 
-        if (Gdx.input.isKeyPressed(Keys.O)) {
-            try {
-                wrapped = ByteBuffer.wrap(buffer);
+        //send inputs
+        try {
+            wrapped = ByteBuffer.wrap(buffer);
 
-                wrapped.putInt(protocolID);
-                wrapped.position(wrapped.position() + 4);
-                wrapped.putInt(sequence);
-                wrapped.position(wrapped.position() + 4);
-                wrapped.putInt(ack);
-                wrapped.position(wrapped.position() + 4);
-                BitSet tempBitSet = new BitSet();
-                for (int i = 0; i < getLocalAckSet().length; i++) {
-                    tempBitSet.set(i, getLocalAckSet()[i]); //convert from boolean[] to bitset
-                }
-                wrapped.put(tempBitSet.toByteArray()); //its okay to write the whole bitset because the bitset > 32 is just zeroes
-                wrapped.position(wrapped.position() + 4);
-
-                byte[] echo = "echo".getBytes();
-                wrapped.put(echo);
-
-                packet = new DatagramPacket(buffer, buffer.length, address, udpPort);
-                if (!outPackets.isEmpty()) {
-                    outPackets.take(); //remove oldest packet from recieved packet queue
-                }
-                outPackets.add(new PacketContainer(packet, Instant.now().getEpochSecond())); //need to fix like inpackets
-
-                socket.send(packet);
-                sequence += 1;
-            } catch (Exception ex) {
-                ex.printStackTrace();
+            wrapped.putInt(protocolID);
+            wrapped.position(4);
+            wrapped.putInt(sequence);
+            wrapped.position(8);
+            wrapped.putInt(ack);
+            wrapped.position(12);
+            BitSet tempBitSet = new BitSet();
+            for (int i = 0; i < getLocalAckSet().length; i++) {
+                tempBitSet.set(i, getLocalAckSet()[i]); //convert from boolean[] to bitset
             }
+            wrapped.put(tempBitSet.toByteArray()); //its okay to write the whole bitset because the bitset > 32 is just zeroes
+            wrapped.position(16);
+
+            wrapped.putInt(1);
+
+            wrapped.position(20);
+            if (this.state.isW()) {
+                wrapped.putInt(1);
+            } else {
+                wrapped.putInt(0);
+            }
+
+            wrapped.position(24);
+            if (this.state.isA()) {
+                wrapped.putInt(1);
+            } else {
+                wrapped.putInt(0);
+            }
+
+            wrapped.position(28);
+            if (this.state.isS()) {
+                wrapped.putInt(1);
+            } else {
+                wrapped.putInt(0);
+            }
+
+            wrapped.position(32);
+            if (this.state.isD()) {
+                wrapped.putInt(1);
+            } else {
+                wrapped.putInt(0);
+            }
+
+            packet = new DatagramPacket(buffer, buffer.length, address, udpPort);
+            if (!outPackets.isEmpty()) {
+                outPackets.take(); //remove oldest packet from recieved packet queue
+            }
+            outPackets.add(new PacketContainer(packet, Instant.now().getEpochSecond())); //need to fix like inpackets
+
+            socket.send(packet);
+            sequence += 1;
+            //System.out.println("input sent");
+        } catch (Exception ex) {
         }
 
+        /*if (Gdx.input.isKeyPressed(Keys.O)) {
+         try {
+         wrapped = ByteBuffer.wrap(buffer);
+
+         wrapped.putInt(protocolID);
+         wrapped.position(wrapped.position() + 4);
+         wrapped.putInt(sequence);
+         wrapped.position(wrapped.position() + 4);
+         wrapped.putInt(ack);
+         wrapped.position(wrapped.position() + 4);
+         BitSet tempBitSet = new BitSet();
+         for (int i = 0; i < getLocalAckSet().length; i++) {
+         tempBitSet.set(i, getLocalAckSet()[i]); //convert from boolean[] to bitset
+         }
+         wrapped.put(tempBitSet.toByteArray()); //its okay to write the whole bitset because the bitset > 32 is just zeroes
+         wrapped.position(wrapped.position() + 4);
+
+         byte[] echo = "echo".getBytes();
+         wrapped.put(echo);
+
+         packet = new DatagramPacket(buffer, buffer.length, address, udpPort);
+         if (!outPackets.isEmpty()) {
+         outPackets.take(); //remove oldest packet from recieved packet queue
+         }
+         outPackets.add(new PacketContainer(packet, Instant.now().getEpochSecond())); //need to fix like inpackets
+
+         socket.send(packet);
+         sequence += 1;
+         } catch (Exception ex) {
+         ex.printStackTrace();
+         }
+         }*/
         world.step(1 / 45f, 6, 2);
         Gdx.gl.glClearColor(1, 1, 1, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -227,26 +304,49 @@ public class Fighter extends ApplicationAdapter {
                 // Update the entities/sprites position and angle
                 bd.setX(b.getPosition().x - 30);
                 bd.setY(b.getPosition().y - 30);
-                if (bd.getName().equals("player")) {
-                    if (player.isOnGround()) {
-                        if (b.getLinearVelocity().x > 5 || b.getLinearVelocity().x < -5) {
-                            currentFrame = walkAnimation.getKeyFrame(stateTime, true);  // #16
+                if (bd.getName().contains("player")) {
+                    if (bd.getName().equals("player1")) {
+                        if (player1.isOnGround()) {
+                            if (b.getLinearVelocity().x > 5 || b.getLinearVelocity().x < -5) {
+                                currentFrame = walkAnimation.getKeyFrame(stateTime, true);  // #16
 
-                            spriteBatch.begin();
-                            //spriteBatch.draw(currentFrame, bd.getX(), bd.getY());      
-                            spriteBatch.draw(currentFrame.getTexture(), bd.getX(), bd.getY(), 64, 64, currentFrame.getRegionX(), currentFrame.getRegionY(), currentFrame.getRegionWidth(), currentFrame.getRegionHeight(), player.isHeadingLeft(), false);// #17
-                            spriteBatch.end();
+                                spriteBatch.begin();
+                                //spriteBatch.draw(currentFrame, bd.getX(), bd.getY());      
+                                spriteBatch.draw(currentFrame.getTexture(), bd.getX(), bd.getY(), 64, 64, currentFrame.getRegionX(), currentFrame.getRegionY(), currentFrame.getRegionWidth(), currentFrame.getRegionHeight(), player1.isHeadingLeft(), false);// #17
+                                spriteBatch.end();
+                            } else {
+                                currentFrame = idleAnimation.getKeyFrame(stateTime, true);  // #16
+                                spriteBatch.begin();
+                                spriteBatch.draw(currentFrame.getTexture(), bd.getX(), bd.getY(), 64, 64, currentFrame.getRegionX(), currentFrame.getRegionY(), currentFrame.getRegionWidth(), currentFrame.getRegionHeight(), player1.isHeadingLeft(), false);             // #17
+                                spriteBatch.end();
+                            }
                         } else {
-                            currentFrame = idleAnimation.getKeyFrame(stateTime, true);  // #16
+                            currentFrame = jumpAnimation.getKeyFrame(stateTime, true);  // #16
                             spriteBatch.begin();
-                            spriteBatch.draw(currentFrame.getTexture(), bd.getX(), bd.getY(), 64, 64, currentFrame.getRegionX(), currentFrame.getRegionY(), currentFrame.getRegionWidth(), currentFrame.getRegionHeight(), player.isHeadingLeft(), false);             // #17
+                            spriteBatch.draw(currentFrame.getTexture(), bd.getX(), bd.getY(), 64, 64, currentFrame.getRegionX(), currentFrame.getRegionY(), currentFrame.getRegionWidth(), currentFrame.getRegionHeight(), player1.isHeadingLeft(), false);           // #17
                             spriteBatch.end();
                         }
-                    } else {
-                        currentFrame = jumpAnimation.getKeyFrame(stateTime, true);  // #16
-                        spriteBatch.begin();
-                        spriteBatch.draw(currentFrame.getTexture(), bd.getX(), bd.getY(), 64, 64, currentFrame.getRegionX(), currentFrame.getRegionY(), currentFrame.getRegionWidth(), currentFrame.getRegionHeight(), player.isHeadingLeft(), false);           // #17
-                        spriteBatch.end();
+                    } else if (bd.getName().equals("player2")) {
+                        if (player2.isOnGround()) {
+                            if (b.getLinearVelocity().x > 5 || b.getLinearVelocity().x < -5) {
+                                currentFrame = walkAnimation.getKeyFrame(stateTime, true);  // #16
+
+                                spriteBatch.begin();
+                                //spriteBatch.draw(currentFrame, bd.getX(), bd.getY());      
+                                spriteBatch.draw(currentFrame.getTexture(), bd.getX(), bd.getY(), 64, 64, currentFrame.getRegionX(), currentFrame.getRegionY(), currentFrame.getRegionWidth(), currentFrame.getRegionHeight(), player2.isHeadingLeft(), false);// #17
+                                spriteBatch.end();
+                            } else {
+                                currentFrame = idleAnimation.getKeyFrame(stateTime, true);  // #16
+                                spriteBatch.begin();
+                                spriteBatch.draw(currentFrame.getTexture(), bd.getX(), bd.getY(), 64, 64, currentFrame.getRegionX(), currentFrame.getRegionY(), currentFrame.getRegionWidth(), currentFrame.getRegionHeight(), player2.isHeadingLeft(), false);             // #17
+                                spriteBatch.end();
+                            }
+                        } else {
+                            currentFrame = jumpAnimation.getKeyFrame(stateTime, true);  // #16
+                            spriteBatch.begin();
+                            spriteBatch.draw(currentFrame.getTexture(), bd.getX(), bd.getY(), 64, 64, currentFrame.getRegionX(), currentFrame.getRegionY(), currentFrame.getRegionWidth(), currentFrame.getRegionHeight(), player2.isHeadingLeft(), false);           // #17
+                            spriteBatch.end();
+                        }
                     }
                 }
             }
@@ -263,8 +363,12 @@ public class Fighter extends ApplicationAdapter {
             ArrayList<String> names = new ArrayList<String>();
             names.add(((BodyData) contact.getFixtureA().getBody().getUserData()).getName());
             names.add(((BodyData) contact.getFixtureB().getBody().getUserData()).getName());
-            if (names.contains("player") && names.contains("ground")) {
-                player.setOnGround(false);
+            if ((names.contains("player1") || names.contains("player2")) && names.contains("ground")) {
+                if (names.contains("player1")) {
+                    player1.setOnGround(false);
+                } else if (names.contains("player2")) {
+                    player2.setOnGround(false);
+                }
                 Gdx.app.log("MyTag", "In Air");
             }
         }
@@ -276,8 +380,12 @@ public class Fighter extends ApplicationAdapter {
             BodyData bodyDataB = (BodyData) contact.getFixtureB().getBody().getUserData();
             names.add(bodyDataA.getName());
             names.add(bodyDataB.getName());
-            if (names.contains("player") && names.contains("ground")) {
-                player.setOnGround(true);
+            if ((names.contains("player1") || names.contains("player2")) && names.contains("ground")) {
+                if (names.contains("player1")) {
+                    player1.setOnGround(true);
+                } else if (names.contains("player2")) {
+                    player2.setOnGround(true);
+                }
                 Gdx.app.log("MyTag", "On Ground");
             }
         }
@@ -297,7 +405,7 @@ public class Fighter extends ApplicationAdapter {
 
         //packet, wrapped, buffer, etc. are all different from ones initialized at the top of the class
         //these are used for reciving, those are used for sending
-        DatagramPacket packet;
+        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
         ByteBuffer wrapped;
         byte[] remoteAckBytes = new byte[4];
         int remoteSequence; // the server's remote sequence int that we recieve
@@ -307,21 +415,26 @@ public class Fighter extends ApplicationAdapter {
         //int port;
         boolean[] tmpSet = new boolean[32];
 
+        float remoteX = 0;
+        float remoteY = 0;
+        float remoteVelX = 0;
+        float remoteVelY = 0;
+
         /*public IncomingReader(int port) {
          this.port = port;
          }*/
         @Override
         public void run() {
             try {
-                socket = new DatagramSocket();
+                //socket = new DatagramSocket();
                 while (true) {
-                    packet = new DatagramPacket(buffer, buffer.length);
+                    System.out.println("loop is running");
                     socket.receive(packet);
                     wrapped = ByteBuffer.wrap(packet.getData());
                     wrapped.position(0);
 
                     if (wrapped.getInt() == protocolID) {
-                        wrapped.position(wrapped.position() + 4);
+                        wrapped.position(4);
                         remoteSequence = wrapped.getInt();
                         if (remoteSequence >= ack - 32) { //make sure packet is recent enough to matter
                             if (!inPackets.isEmpty()) {
@@ -349,15 +462,15 @@ public class Fighter extends ApplicationAdapter {
                                     ack = remoteSequence; //update local ack if remote sequence is more recent
                                 }
                             } else {
-                                bitIndex = 31 - (ack - remoteSequence); //get index of bit to be set
-                                if (!getLocalAckSet()[bitIndex]) {
-                                    getLocalAckSet()[bitIndex] = true;
-                                }
+                                /*bitIndex = 31 - (ack - remoteSequence); //get index of bit to be set
+                                 if (!getLocalAckSet()[bitIndex]) {
+                                 getLocalAckSet()[bitIndex] = true;
+                                 }*/
                             }
-                            wrapped.position(wrapped.position() + 4);
+                            wrapped.position(8);
                             remoteAck = wrapped.getInt(); //get remote ack
 
-                            wrapped.position(wrapped.position() + 4);
+                            wrapped.position(12);
                             wrapped.get(remoteAckBytes); //get remote ack bitset
 
                             for (int i = 0; i < remoteAckBytes.length; i++) {
@@ -371,38 +484,79 @@ public class Fighter extends ApplicationAdapter {
                             }
                         }
                         //String received = new String(inBytes, 0, inBytes.length);
-                        System.out.println("Local Sequence: " + sequence);
-                        System.out.println("Remote Sequence: " + ack);
-                        for (int i = getRemoteAckSet().length - 1; i >= 0; i--) {
-                            System.out.println(i + " " + getRemoteAckSet()[i]);
-                        }
+                        /*System.out.println("Local Sequence: " + sequence);
+                         System.out.println("Remote Sequence: " + ack);
+                         for (int i = getRemoteAckSet().length - 1; i >= 0; i--) {
+                         System.out.println(i + " " + getRemoteAckSet()[i]);
+                         }*/
                         //Gdx.app.log("UDP Message", received);
                     }
 
                     //resend lost packets
-                    long now = Instant.now().getEpochSecond();
-                    for (PacketContainer pc : outPackets) {
-                        wrapped = ByteBuffer.wrap(pc.getPacket().getData());
-                        wrapped.position(4);
-                        int sequenceNumber = wrapped.getInt();
-                        if (sequenceNumber != ack) {
-                            //check to see if packed is acked in ackset
-                            //resend if it isn't
-                            int ackIndex = ack - sequenceNumber;
+                    /* now = Instant.now().getEpochSecond();
+                     for (PacketContainer pc : outPackets) {
+                     ByteBuffer newWrapped = ByteBuffer.wrap(pc.getPacket().getData());
+                     newWrapped.position(4);
+                     int sequenceNumber = newWrapped.getInt();
+                     if (sequenceNumber != ack) {
+                     //check to see if packed is acked in ackset
+                     //resend if it isn't
+                     int ackIndex = ack - sequenceNumber;
 
-                            if (ackIndex >= 0 && ackIndex < 32) {
-                                if (!getRemoteAckSet()[31 - (ack - sequenceNumber)] && now - pc.getTimestamp() >= 1) {
-                                    socket.send(pc.getPacket());
-                                    System.out.println("resending packet");
-                                }
-                            }
-                        } else {
-                            if (now - pc.getTimestamp() >= 1) {
-                                socket.send(pc.getPacket());
-                                System.out.println("resending packet");
-                            }
-                        }
+                     if (ackIndex >= 0 && ackIndex < 32) {
+                     if (!getRemoteAckSet()[31 - (ack - sequenceNumber)] && now - pc.getTimestamp() >= 1) {
+                     socket.send(pc.getPacket());
+                     System.out.println("resending packet");
+                     }
+                     }
+                     } else {
+                     if (now - pc.getTimestamp() >= 1) {
+                     socket.send(pc.getPacket());
+                     System.out.println("resending packet");
+                     }
+                     }
+                     }*/
+                    wrapped.position(16);
+                    System.out.println(wrapped.getInt());
+                    wrapped.position(16);
+                    if (wrapped.getInt() == 0) { //world state update
+                        System.out.println("got state");
+                        wrapped.position(20);
+
+                        //player 1
+                        remoteX = wrapped.getFloat();
+                        wrapped.position(24);
+                        remoteY = wrapped.getFloat();
+                        wrapped.position(28);
+
+                        player1.getBody().setTransform(remoteX, remoteY, 0);
+
+                        remoteVelX = wrapped.getFloat();
+                        wrapped.position(32);
+                        remoteVelY = wrapped.getFloat();
+                        wrapped.position(36);
+
+                        player1.getBody().setLinearVelocity(new Vector2(remoteVelX, remoteVelY));
+                        System.out.println("p1 state set");
+
+                        //player 2
+                        remoteX = wrapped.getFloat();
+                        wrapped.position(40);
+                        remoteY = wrapped.getFloat();
+                        wrapped.position(44);
+
+                        player2.getBody().setTransform(remoteX, remoteY, 0);
+
+                        remoteVelX = wrapped.getFloat();
+                        wrapped.position(48);
+                        remoteVelY = wrapped.getFloat();
+                        wrapped.position(52);
+
+                        player2.getBody().setLinearVelocity(new Vector2(remoteVelX, remoteVelY));
+                        System.out.println("p2 state set");
+
                     }
+
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
