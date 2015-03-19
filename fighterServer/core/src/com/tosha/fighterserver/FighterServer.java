@@ -31,7 +31,7 @@ public class FighterServer {
     ArrayBlockingQueue<InputState> inputs = new ArrayBlockingQueue<InputState>(120);
     boolean player1Connected;
 
-    public static void main(String[] arg) {
+    public static void main(String[] args) {
         FighterServer server = new FighterServer();
         server.go();
     }
@@ -44,6 +44,7 @@ public class FighterServer {
             Box2D.init();
             world = new World(new Vector2(0, -20), true);
             world.setContactListener(new ListenerClass());
+            //world.setContinuousPhysics(true);
 
             player1 = new PlayerEntity(world, "player1", 100.0f, 100.0f);
             player2 = new PlayerEntity(world, "player2", 400.0f, 100.0f);
@@ -61,6 +62,11 @@ public class FighterServer {
             groundBody.createFixture(fixtureDef);
             groundBody.setUserData(new BodyData("ground", groundBody.getPosition().x, groundBody.getPosition().y));
             groundBox.dispose();
+            
+            int grounded1 = 0;
+            int grounded2 = 0;
+            int heading1 = 0;
+            int heading2 = 0;
 
             while (true) {
                 Thread.sleep(33);
@@ -98,54 +104,80 @@ public class FighterServer {
                     if (player1.player.state.isW() && vel1.y < player1.getMaxVelocityY()) {
                         this.player1.getBody().applyLinearImpulse(0, player1.getSpeedY(), pos1.x, pos1.y, true);
                     }
+                    
                 }
 
                 //player 2 networking
                 if (player2.player != null) {
-                    if (player2.player.state.isA() && vel1.x > -player2.getMaxVelocityX()) {
-                        this.player2.getBody().applyLinearImpulse(-player2.getSpeedX(), 0, pos1.x, pos1.y, true);
+                    if (player2.player.state.isA() && vel2.x > -player2.getMaxVelocityX()) {
+                        this.player2.getBody().applyLinearImpulse(-player2.getSpeedX(), 0, pos2.x, pos2.y, true);
                         player2.setHeadingLeft(true);
                     }
 
-                    if (player2.player.state.isD() && vel1.x < player2.getMaxVelocityX()) {
-                        this.player2.getBody().applyLinearImpulse(player2.getSpeedX(), 0, pos1.x, pos1.y, true);
+                    if (player2.player.state.isD() && vel2.x < player2.getMaxVelocityX()) {
+                        this.player2.getBody().applyLinearImpulse(player2.getSpeedX(), 0, pos2.x, pos2.y, true);
                         player2.setHeadingLeft(false);
                     }
 
                     if (!player2.player.state.isA() && !player2.player.state.isD()) {
-                        if (vel1.x > 0) {
-                            this.player2.getBody().applyLinearImpulse(-player2.getBreakSpeedY(), 0, pos1.x, pos1.y, true);
-                        } else if (vel1.x < 0) {
-                            this.player2.getBody().applyLinearImpulse(player2.getBreakSpeedY(), 0, pos1.x, pos1.y, true);
+                        if (vel2.x > 0) {
+                            this.player2.getBody().applyLinearImpulse(-player2.getBreakSpeedY(), 0, pos2.x, pos2.y, true);
+                        } else if (vel2.x < 0) {
+                            this.player2.getBody().applyLinearImpulse(player2.getBreakSpeedY(), 0, pos2.x, pos2.y, true);
                         }
                     }
 
-                    if (player2.player.state.isS() && vel1.y > -player2.getMaxVelocityY()) {
-                        this.player2.getBody().applyLinearImpulse(0, -player2.getSpeedY(), pos1.x, pos1.y, true);
+                    if (player2.player.state.isS() && vel2.y > -player2.getMaxVelocityY()) {
+                        this.player2.getBody().applyLinearImpulse(0, -player2.getSpeedY(), pos2.x, pos2.y, true);
                     }
 
-                    if (player2.player.state.isW() && vel1.y < player2.getMaxVelocityY()) {
-                        this.player2.getBody().applyLinearImpulse(0, player2.getSpeedY(), pos1.x, pos1.y, true);
+                    if (player2.player.state.isW() && vel2.y < player2.getMaxVelocityY()) {
+                        this.player2.getBody().applyLinearImpulse(0, player2.getSpeedY(), pos2.x, pos2.y, true);
                     }
                 }
 
                 world.step(1 / 45f, 6, 2);
                 //update player states
+                while (world.isLocked()) {
+                    Thread.sleep(1);
+                }
+                if (player1.isHeadingLeft()) {
+                    heading1 = 1;
+                } else {
+                    heading1 = 0;
+                }
+                if (player2.isHeadingLeft()) {
+                    heading2 = 1;
+                } else {
+                    heading2 = 0;
+                }
+                
+                if (player1.isOnGround()) {
+                    grounded1 = 1;
+                } else {
+                    grounded1 = 0;
+                }
+                if (player2.isOnGround()) {
+                    grounded2 = 1;
+                } else {
+                    grounded2 = 0;
+                }
+                
                 if (player1.player != null) {
                     player1.player.updateState(player1.getBody().getPosition().x,
                             player1.getBody().getPosition().y, player1.getBody().getLinearVelocity().x,
                             player1.getBody().getLinearVelocity().y, player2.getBody().getPosition().x,
-                            player2.getBody().getPosition().x, player2.getBody().getLinearVelocity().x,
-                            player2.getBody().getLinearVelocity().y);
-                            //System.out.println("p1 state sent");
+                            player2.getBody().getPosition().y, player2.getBody().getLinearVelocity().x,
+                            player2.getBody().getLinearVelocity().y, heading1, heading2, grounded1, grounded2);
+                    //System.out.println("p1 state sent");
                 }
                 if (player2.player != null) {
                     player2.player.updateState(player1.getBody().getPosition().x,
                             player1.getBody().getPosition().y, player1.getBody().getLinearVelocity().x,
                             player1.getBody().getLinearVelocity().y, player2.getBody().getPosition().x,
-                            player2.getBody().getPosition().x, player2.getBody().getLinearVelocity().x,
-                            player2.getBody().getLinearVelocity().y);
-                            //System.out.println("p2 state sent");
+                            player2.getBody().getPosition().y, player2.getBody().getLinearVelocity().x,
+                            player2.getBody().getLinearVelocity().y, heading1, heading2, grounded1, grounded2);
+                    //System.out.println("p2 state sent");
 
                 }
                 //gameworld update logic here
@@ -228,9 +260,9 @@ public class FighterServer {
                                 }
                             } else {
                                 /*bitIndex = 31 - (player.ack - remoteSequence); //get index of bit to be set
-                                if (!player.localAckSet[bitIndex]) {
-                                    player.localAckSet[bitIndex] = true;
-                                }*/
+                                 if (!player.localAckSet[bitIndex]) {
+                                 player.localAckSet[bitIndex] = true;
+                                 }*/
                             }
                             wrapped.position(8);
                             remoteAck = wrapped.getInt(); //get remote ack
@@ -250,35 +282,35 @@ public class FighterServer {
                         }
                         //String received = new String(inBytes, 0, inBytes.length);
                         /*System.out.println("Local Sequence: " + player.sequence);
-                        System.out.println("Remote Sequence: " + player.ack);
-                        for (int i = player.remoteAckSet.length - 1; i >= 0; i--) {
-                            System.out.println(i + " " + player.remoteAckSet[i]);
-                        }*/
+                         System.out.println("Remote Sequence: " + player.ack);
+                         for (int i = player.remoteAckSet.length - 1; i >= 0; i--) {
+                         System.out.println(i + " " + player.remoteAckSet[i]);
+                         }*/
 
                         //resend lost packets
                         /*long now = Instant.now().getEpochSecond();
-                        for (PacketContainer pc : player.outPackets) {
-                            ByteBuffer newWrapped = ByteBuffer.wrap(pc.getPacket().getData());
-                            newWrapped.position(4);
-                            int sequenceNumber = newWrapped.getInt();
-                            if (sequenceNumber != player.ack) {
-                                //check to see if packed is acked in ackset
-                                //resend if it isn't
-                                int ackIndex = player.ack - sequenceNumber;
+                         for (PacketContainer pc : player.outPackets) {
+                         ByteBuffer newWrapped = ByteBuffer.wrap(pc.getPacket().getData());
+                         newWrapped.position(4);
+                         int sequenceNumber = newWrapped.getInt();
+                         if (sequenceNumber != player.ack) {
+                         //check to see if packed is acked in ackset
+                         //resend if it isn't
+                         int ackIndex = player.ack - sequenceNumber;
 
-                                if (ackIndex >= 0 && ackIndex < 32) {
-                                    if (!player.remoteAckSet[31 - (player.ack - sequenceNumber)] && now - pc.getTimestamp() >= 1) {
-                                        socket.send(pc.getPacket());
-                                        System.out.println("resending packet");
-                                    }
-                                }
-                            } else {
-                                if (now - pc.getTimestamp() >= 1) {
-                                    socket.send(pc.getPacket());
-                                    System.out.println("resending packet");
-                                }
-                            }
-                        }*/
+                         if (ackIndex >= 0 && ackIndex < 32) {
+                         if (!player.remoteAckSet[31 - (player.ack - sequenceNumber)] && now - pc.getTimestamp() >= 1) {
+                         socket.send(pc.getPacket());
+                         System.out.println("resending packet");
+                         }
+                         }
+                         } else {
+                         if (now - pc.getTimestamp() >= 1) {
+                         socket.send(pc.getPacket());
+                         System.out.println("resending packet");
+                         }
+                         }
+                         }*/
                         wrapped.position(16);
                         if (wrapped.getInt() == 1) { //code 1 is for input updates
                             wrapped.position(20);
@@ -308,13 +340,12 @@ public class FighterServer {
                             } else {
                                 player.state.setD(false);
                             }
-                            
+
                             //System.out.println("W: " + player.state.isW() + " A: " + player.state.isA() + " S: " + player.state.isS() + " D: " + player.state.isD());
                         }
-                        
+
                         //System.out.println(packet.getAddress().toString());
                         //System.out.println(packet.getPort());
-
                         //
                         //Code to send packet
                         //

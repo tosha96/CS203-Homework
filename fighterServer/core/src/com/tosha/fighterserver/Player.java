@@ -103,7 +103,9 @@ public class Player {
         this.port = port;
     }
 
-    public synchronized void updateState(float x1, float y1, float xv1, float yv1, float x2, float y2, float xv2, float yv2) {
+    public synchronized void updateState(float x1, float y1, float xv1, float yv1, 
+            float x2, float y2, float xv2, float yv2, int headingLeft1, int headingLeft2, 
+            int onGround1, int onGround2) {
         try {
             buffer = new byte[256];
             wrapped = ByteBuffer.wrap(buffer);
@@ -143,6 +145,16 @@ public class Player {
             wrapped.position(48);
             wrapped.putFloat(yv2);
             wrapped.position(52);
+            
+            wrapped.putInt(headingLeft1);
+            wrapped.position(56);
+            wrapped.putInt(headingLeft2);
+            
+            wrapped.position(60);
+            wrapped.putInt(onGround1);
+            wrapped.position(64);
+            wrapped.putInt(onGround2);
+            
 
             //byte[] echo = "echo".getBytes();
             //wrapped.put(echo);

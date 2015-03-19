@@ -72,8 +72,9 @@ public class Fighter extends ApplicationAdapter {
     @Override
     public void create() {
         Box2D.init();
-        world = new World(new Vector2(0, -20), true);
-        world.setContactListener(new ListenerClass());
+        world = new World(new Vector2(0, 0), true);
+        //world.setContinuousPhysics(true);
+        //world.setContactListener(new ListenerClass());
         debugRenderer = new Box2DDebugRenderer();
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 800, 480);
@@ -168,14 +169,14 @@ public class Fighter extends ApplicationAdapter {
         //WASD to move
         if (Gdx.input.isKeyPressed(Keys.A) && vel.x > -currentPlayer.getMaxVelocityX()) {
             //this.currentPlayer.getBody().applyLinearImpulse(-currentPlayer.getSpeedX(), 0, pos.x, pos.y, true);
-            currentPlayer.setHeadingLeft(true);
+            //currentPlayer.setHeadingLeft(true);
             this.state.setA(true);
             //currentFrame.flip(true, false);
         }
 
         if (Gdx.input.isKeyPressed(Keys.D) && vel.x < currentPlayer.getMaxVelocityX()) {
             //this.currentPlayer.getBody().applyLinearImpulse(currentPlayer.getSpeedX(), 0, pos.x, pos.y, true);
-            currentPlayer.setHeadingLeft(false);
+            //currentPlayer.setHeadingLeft(false);
             this.state.setD(true);
             //currentFrame.flip(false, false);
         }
@@ -302,8 +303,8 @@ public class Fighter extends ApplicationAdapter {
 
             if (bd != null) {
                 // Update the entities/sprites position and angle
-                bd.setX(b.getPosition().x - 30);
-                bd.setY(b.getPosition().y - 30);
+                bd.setX(b.getPosition().x - 31);
+                bd.setY(b.getPosition().y - 31);
                 if (bd.getName().contains("player")) {
                     if (bd.getName().equals("player1")) {
                         if (player1.isOnGround()) {
@@ -520,10 +521,13 @@ public class Fighter extends ApplicationAdapter {
                     System.out.println(wrapped.getInt());
                     wrapped.position(16);
                     if (wrapped.getInt() == 0) { //world state update
-                        System.out.println("got state");
                         wrapped.position(20);
 
                         //player 1
+                        while (world.isLocked()) {
+                            Thread.sleep(1);
+                        }
+
                         remoteX = wrapped.getFloat();
                         wrapped.position(24);
                         remoteY = wrapped.getFloat();
@@ -537,7 +541,6 @@ public class Fighter extends ApplicationAdapter {
                         wrapped.position(36);
 
                         player1.getBody().setLinearVelocity(new Vector2(remoteVelX, remoteVelY));
-                        System.out.println("p1 state set");
 
                         //player 2
                         remoteX = wrapped.getFloat();
@@ -550,10 +553,36 @@ public class Fighter extends ApplicationAdapter {
                         remoteVelX = wrapped.getFloat();
                         wrapped.position(48);
                         remoteVelY = wrapped.getFloat();
-                        wrapped.position(52);
 
                         player2.getBody().setLinearVelocity(new Vector2(remoteVelX, remoteVelY));
-                        System.out.println("p2 state set");
+
+                        wrapped.position(52);
+                        if (wrapped.getInt() == 1) {
+                            player1.setHeadingLeft(true);
+                        } else {
+                            player1.setHeadingLeft(false);
+                        }
+
+                        wrapped.position(56);
+                        if (wrapped.getInt() == 1) {
+                            player2.setHeadingLeft(true);
+                        } else {
+                            player2.setHeadingLeft(false);
+                        }
+
+                        wrapped.position(60);
+                        if (wrapped.getInt() == 1) {
+                            player1.setOnGround(true);
+                        } else {
+                            player1.setOnGround(false);
+                        }
+
+                        wrapped.position(64);
+                        if (wrapped.getInt() == 1) {
+                            player2.setOnGround(true);
+                        } else {
+                            player2.setOnGround(false);
+                        }
 
                     }
 
